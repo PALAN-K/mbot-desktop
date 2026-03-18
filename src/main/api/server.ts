@@ -164,6 +164,10 @@ export function startApiServer(options: ApiServerOptions) {
           desc: 'Send key event. Common: KEYCODE_BACK, KEYCODE_HOME, 66 (enter).',
         },
         {
+          method: 'POST', path: '/api/sms/send', body: { serial: 'string', number: 'string', message: 'string' },
+          desc: 'Send SMS. Opens messaging app, types message (Korean supported), and taps send.',
+        },
+        {
           method: 'POST', path: '/api/call', body: { serial: 'string', number: 'string' },
           desc: 'Make a phone call.',
         },

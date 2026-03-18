@@ -30,6 +30,83 @@ export function createActionsRoutes(_adb: AdbManager) {
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, clamped);
   }
 
+  /**
+   * POST /api/sms/send — SMS 전송
+   * ADB intent로 기본 문자 앱을 열고 전송까지 처리
+   */
+  router.post('/sms/send', async (req, res) => {
+    const { serial, number, message } = req.body;
+    if (!serial || !number || !message) {
+      res.status(400).json({ error: 'serial, number, message required' });
+      return;
+    }
+    if (typeof message !== 'string' || message.length > 1000) {
+      res.status(400).json({ error: 'message must be string, max 1000 chars' });
+      return;
+    }
+
+    try {
+      const cleanNumber = sanitizePhoneNumber(number);
+
+      // 1. 문자 앱 열기 (번호 + 본문 세팅)
+      adbShell(serial, `am start -a android.intent.action.SENDTO -d sms:${cleanNumber}`);
+      sleep(1000);
+
+      // 2. 입력 필드 찾기
+      const elements = getScreen(serial);
+      const inputField = elements.find(e =>
+        e.className.includes('EditText')
+      );
+
+      if (!inputField) {
+        res.status(400).json({ error: 'SMS input field not found. Is the messaging app open?' });
+        return;
+      }
+
+      // 3. 입력 필드 탭
+      const center = getCenterPoint(inputField.bounds);
+      tap(serial, center.x, center.y);
+      sleep(300);
+
+      // 4. 한글 포함 텍스트 입력 (클립보드 방식)
+      // 폰 클립보드에 텍스트 설정 후 붙여넣기
+      const escaped = message.replace(/'/g, "'\\''");
+      adbShell(serial, `am broadcast -a clipper.set -e text '${escaped}'`);
+      sleep(200);
+      // ADBKeyboard 방식 (fallback)
+      const base64 = Buffer.from(message, 'utf-8').toString('base64');
+      adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
+      sleep(500);
+
+      // 5. 전송 버튼 찾기 + 탭
+      const elements2 = getScreen(serial);
+      const sendBtn = elements2.find(e =>
+        e.contentDesc.includes('보내기') || e.contentDesc.includes('전송') || e.contentDesc.includes('Send') ||
+        e.text === '전송' || e.text === '보내기' || e.text === 'Send' ||
+        (e.resourceId.includes('send') && e.clickable)
+      );
+
+      if (sendBtn) {
+        const sendCenter = getCenterPoint(sendBtn.bounds);
+        tap(serial, sendCenter.x, sendCenter.y);
+        sleep(500);
+
+        // 6. 검증 — 메시지 앱에서 전송 확인
+        const elements3 = getScreen(serial);
+        const texts = elements3.filter(e => e.text).map(e => e.text);
+        const sent = texts.some(t => t.includes(message.substring(0, 20)));
+
+        res.json({ status: sent ? 'sent' : 'sent_unverified', number: cleanNumber, message });
+      } else {
+        // 전송 버튼 못 찾으면 Enter로 시도
+        adbShell(serial, 'input keyevent 66');
+        res.json({ status: 'sent_via_enter', number: cleanNumber, message });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   /** POST /api/kakao/read */
   router.post('/kakao/read', async (req, res) => {
     const { serial, scrollCount = 0 } = req.body;

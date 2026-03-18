@@ -47,18 +47,32 @@ export function createInputRoutes(_adb: AdbManager) {
     }
   });
 
-  /** POST /api/type */
+  /** POST /api/type — 한글 포함 텍스트 입력 */
   router.post('/type', (req, res) => {
     const { serial, text } = req.body;
     if (!serial || !text) {
       res.status(400).json({ error: 'serial, text required' });
       return;
     }
+    if (typeof text !== 'string' || text.length > 2000) {
+      res.status(400).json({ error: 'text must be string, max 2000 chars' });
+      return;
+    }
 
     try {
-      const clean = sanitizeShellArg(text).replace(/ /g, '%s');
-      adbShell(serial, `input text '${clean}'`);
-      res.json({ status: 'ok', action: 'type', text: clean });
+      const isAsciiOnly = /^[\x20-\x7E]*$/.test(text);
+
+      if (isAsciiOnly) {
+        // ASCII만: 기존 input text 사용 (빠름)
+        const clean = sanitizeShellArg(text).replace(/ /g, '%s');
+        adbShell(serial, `input text '${clean}'`);
+        res.json({ status: 'ok', action: 'type', method: 'input_text', text });
+      } else {
+        // 한글 포함: ADB broadcast 방식 (ADBKeyboard 또는 커스텀 IME)
+        const base64 = Buffer.from(text, 'utf-8').toString('base64');
+        adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
+        res.json({ status: 'ok', action: 'type', method: 'broadcast_b64', text });
+      }
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
