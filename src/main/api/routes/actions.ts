@@ -184,11 +184,107 @@ export function createActionsRoutes(_adb: AdbManager) {
    *     { action: "type", text: "안녕하세요" },
    *     { action: "find", text: "전송", tap: true },
    *   ],
-   *   verify?: { text: "안녕하세요", timeout?: 3000 }
+   *   verify?: { text: "안녕하세요", timeout?: 3000 },
+   *   retry?: { count?: 3, delayMs?: 1000 }
    * }
    */
+  // steps 실행 함수 (재시도에서 재사용)
+  function runSteps(serial: string, steps: any[]) {
+    const log: { step: number; action: string; result: string }[] = [];
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+
+      switch (step.action) {
+        case 'find': {
+          const elements = getScreen(serial);
+          let found;
+          if (step.by === 'class') {
+            found = elements.find(e => e.className.includes(step.text));
+          } else if (step.by === 'id') {
+            found = elements.find(e => e.resourceId.includes(step.text));
+          } else if (step.by === 'desc') {
+            found = elements.find(e => e.contentDesc.includes(step.text));
+          } else {
+            found = findByText(elements, step.text);
+          }
+          if (!found) {
+            log.push({ step: i, action: 'find', result: `not found: ${step.text}` });
+            if (step.optional) continue;
+            return { ok: false, failedAt: i, reason: `"${step.text}" not found`, log };
+          }
+          if (step.tap) {
+            const c = getCenterPoint(found.bounds);
+            tap(serial, c.x, c.y);
+            log.push({ step: i, action: 'find+tap', result: `${step.text} at ${c.x},${c.y}` });
+          } else {
+            log.push({ step: i, action: 'find', result: `found: ${found.text || found.className}` });
+          }
+          break;
+        }
+        case 'tap': {
+          tap(serial, sanitizeCoord(step.x), sanitizeCoord(step.y));
+          log.push({ step: i, action: 'tap', result: `${step.x},${step.y}` });
+          break;
+        }
+        case 'type': {
+          if (!step.text) break;
+          const base64 = Buffer.from(step.text, 'utf-8').toString('base64');
+          adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
+          log.push({ step: i, action: 'type', result: step.text.substring(0, 30) });
+          break;
+        }
+        case 'keyevent': {
+          adbShell(serial, `input keyevent ${step.keycode || 66}`);
+          log.push({ step: i, action: 'keyevent', result: `${step.keycode || 66}` });
+          break;
+        }
+        case 'swipe': {
+          const x1 = step.x1 || 540, y1 = step.y1 || 1500;
+          const x2 = step.x2 || 540, y2 = step.y2 || 500;
+          adbShell(serial, `input swipe ${x1} ${y1} ${x2} ${y2} ${step.duration || 300}`);
+          log.push({ step: i, action: 'swipe', result: 'ok' });
+          break;
+        }
+        case 'launch': {
+          if (step.package) {
+            adbShell(serial, `monkey -p ${step.package} -c android.intent.category.LAUNCHER 1`);
+            log.push({ step: i, action: 'launch', result: step.package });
+          }
+          break;
+        }
+        case 'back': {
+          adbShell(serial, 'input keyevent KEYCODE_BACK');
+          log.push({ step: i, action: 'back', result: 'ok' });
+          break;
+        }
+        case 'sleep': {
+          sleep(step.ms || 500);
+          log.push({ step: i, action: 'sleep', result: `${step.ms || 500}ms` });
+          break;
+        }
+        default:
+          log.push({ step: i, action: step.action, result: 'unknown action, skipped' });
+      }
+    }
+
+    return { ok: true, log };
+  }
+
+  // 화면 텍스트에서 verify.text 존재 확인
+  function verifyScreen(serial: string, text: string, timeout: number): boolean {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      const elements = getScreen(serial);
+      const texts = elements.filter(e => e.text).map(e => e.text);
+      if (texts.some(t => t.includes(text))) return true;
+      sleep(500);
+    }
+    return false;
+  }
+
   router.post('/do', async (req, res) => {
-    const { serial, steps, verify } = req.body;
+    const { serial, steps, verify, retry } = req.body;
     if (!serial || !Array.isArray(steps) || steps.length === 0) {
       res.status(400).json({ error: 'serial, steps[] required' });
       return;
@@ -198,112 +294,55 @@ export function createActionsRoutes(_adb: AdbManager) {
       return;
     }
 
-    const log: { step: number; action: string; result: string }[] = [];
+    const maxRetries = Math.min(retry?.count || 1, 5);
+    const retryDelay = Math.min(retry?.delayMs || 1000, 5000);
+    const allLogs: any[] = [];
 
     try {
-      for (let i = 0; i < steps.length; i++) {
-        const step = steps[i];
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const result = runSteps(serial, steps);
+        allLogs.push({ attempt, ...result });
 
-        switch (step.action) {
-          case 'find': {
-            const elements = getScreen(serial);
-            let found;
-            if (step.by === 'class') {
-              found = elements.find(e => e.className.includes(step.text));
-            } else if (step.by === 'id') {
-              found = elements.find(e => e.resourceId.includes(step.text));
-            } else if (step.by === 'desc') {
-              found = elements.find(e => e.contentDesc.includes(step.text));
-            } else {
-              found = findByText(elements, step.text);
-            }
-            if (!found) {
-              log.push({ step: i, action: 'find', result: `not found: ${step.text}` });
-              if (step.optional) continue;
-              res.json({ success: false, failedAt: i, reason: `"${step.text}" not found`, log });
-              return;
-            }
-            if (step.tap) {
-              const c = getCenterPoint(found.bounds);
-              tap(serial, c.x, c.y);
-              log.push({ step: i, action: 'find+tap', result: `${step.text} at ${c.x},${c.y}` });
-            } else {
-              log.push({ step: i, action: 'find', result: `found: ${found.text || found.className}` });
-            }
-            break;
+        if (!result.ok) {
+          // steps 실행 자체가 실패
+          if (attempt < maxRetries) {
+            sleep(retryDelay);
+            continue;
           }
-          case 'tap': {
-            tap(serial, sanitizeCoord(step.x), sanitizeCoord(step.y));
-            log.push({ step: i, action: 'tap', result: `${step.x},${step.y}` });
-            break;
-          }
-          case 'type': {
-            if (!step.text) break;
-            // ADB broadcast로 한글 포함 텍스트 입력
-            const base64 = Buffer.from(step.text, 'utf-8').toString('base64');
-            adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
-            log.push({ step: i, action: 'type', result: step.text.substring(0, 30) });
-            break;
-          }
-          case 'keyevent': {
-            adbShell(serial, `input keyevent ${step.keycode || 66}`);
-            log.push({ step: i, action: 'keyevent', result: `${step.keycode || 66}` });
-            break;
-          }
-          case 'swipe': {
-            const x1 = step.x1 || 540, y1 = step.y1 || 1500;
-            const x2 = step.x2 || 540, y2 = step.y2 || 500;
-            adbShell(serial, `input swipe ${x1} ${y1} ${x2} ${y2} ${step.duration || 300}`);
-            log.push({ step: i, action: 'swipe', result: 'ok' });
-            break;
-          }
-          case 'launch': {
-            if (step.package) {
-              adbShell(serial, `monkey -p ${step.package} -c android.intent.category.LAUNCHER 1`);
-              log.push({ step: i, action: 'launch', result: step.package });
-            }
-            break;
-          }
-          case 'back': {
-            adbShell(serial, 'input keyevent KEYCODE_BACK');
-            log.push({ step: i, action: 'back', result: 'ok' });
-            break;
-          }
-          case 'sleep': {
-            sleep(step.ms || 500);
-            log.push({ step: i, action: 'sleep', result: `${step.ms || 500}ms` });
-            break;
-          }
-          default:
-            log.push({ step: i, action: step.action, result: 'unknown action, skipped' });
-        }
-      }
-
-      // 검증 단계
-      if (verify?.text) {
-        const timeout = Math.min(verify.timeout || 3000, 10000);
-        const startTime = Date.now();
-        let verified = false;
-
-        while (Date.now() - startTime < timeout) {
-          const elements = getScreen(serial);
-          const texts = elements.filter(e => e.text).map(e => e.text);
-          if (texts.some(t => t.includes(verify.text))) {
-            verified = true;
-            break;
-          }
-          sleep(500);
+          res.json({ success: false, attempts: attempt, reason: result.reason, logs: allLogs });
+          return;
         }
 
-        res.json({ success: verified, log, verified, verifyText: verify.text });
-      } else {
-        // 검증 없으면 최종 화면 텍스트 반환
+        // 검증
+        if (verify?.text) {
+          const timeout = Math.min(verify.timeout || 3000, 10000);
+          const verified = verifyScreen(serial, verify.text, timeout);
+
+          if (verified) {
+            res.json({ success: true, verified: true, attempts: attempt, verifyText: verify.text, logs: allLogs });
+            return;
+          }
+
+          // 검증 실패 → 재시도
+          if (attempt < maxRetries) {
+            allLogs[allLogs.length - 1].verifyFailed = true;
+            sleep(retryDelay);
+            continue;
+          }
+
+          // 최종 실패
+          res.json({ success: false, verified: false, attempts: attempt, verifyText: verify.text, logs: allLogs });
+          return;
+        }
+
+        // verify 없으면 성공으로 간주
         const elements = getScreen(serial);
         const texts = elements.filter(e => e.text).map(e => e.text);
-        res.json({ success: true, log, screen: texts });
+        res.json({ success: true, attempts: attempt, screen: texts, logs: allLogs });
+        return;
       }
     } catch (error: any) {
-      res.json({ success: false, error: error.message, log });
+      res.json({ success: false, error: error.message, logs: allLogs });
     }
   });
 

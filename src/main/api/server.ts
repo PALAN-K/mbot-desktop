@@ -102,6 +102,7 @@ export function startApiServer(options: ApiServerOptions) {
               '{ action: "tap", x: 540, y: 960 }',
             ],
             verify: '{ text: "expected text on screen", timeout: 3000 } (optional)',
+            retry: '{ count: 3, delayMs: 1000 } (optional, max 5 retries — reruns all steps + verify on failure)',
           },
           find_options: {
             by_text: '{ action: "find", text: "검색" } — default, partial match',
