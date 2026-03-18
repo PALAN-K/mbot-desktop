@@ -28,6 +28,7 @@ export class AdbManager {
   private connector: AdbServerNodeTcpConnector;
   private client: AdbServerClient;
   private mirrorProcesses: Map<string, ChildProcess> = new Map();
+  private keyboardConfigured: Set<string> = new Set();
 
   constructor(host = 'localhost', port = 5037) {
     this.connector = new AdbServerNodeTcpConnector({ host, port });
@@ -190,6 +191,22 @@ export class AdbManager {
     }
 
     try {
+      // UHID 물리 키보드 레이아웃 자동 설정 (최초 1회)
+      // 한/영 전환이 되려면 폰의 물리 키보드 설정에서 레이아웃 추가 필요
+      if (!this.keyboardConfigured.has(serial)) {
+        try {
+          const s = sanitizeSerial(serial);
+          execSync(
+            `adb -s ${s} shell am start -a android.settings.HARD_KEYBOARD_SETTINGS`,
+            { timeout: 3000 }
+          );
+          this.keyboardConfigured.add(serial);
+          console.log('[Mirror] Opened physical keyboard settings — add Korean + English layout');
+        } catch {
+          // 설정 열기 실패해도 미러링은 계속 진행
+        }
+      }
+
       const proc = spawn('scrcpy', [
         '-s', serial,
         '--window-title', `mbot Mirror - ${serial}`,

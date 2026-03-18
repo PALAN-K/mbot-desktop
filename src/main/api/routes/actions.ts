@@ -31,11 +31,13 @@ export function createActionsRoutes(_adb: AdbManager) {
   }
 
   /**
-   * POST /api/sms/send — SMS 전송
-   * ADB intent로 기본 문자 앱을 열고 전송까지 처리
+   * POST /api/sms/send — SMS 전송 (원자적: 실행 + 입력 + 전송 + 검증)
+   *
+   * body: { serial, number, message, verify?: true, timeoutMs?: 8000 }
+   * 응답: { status: "sent"|"failed", stage, number, message, verified, method }
    */
   router.post('/sms/send', async (req, res) => {
-    const { serial, number, message } = req.body;
+    const { serial, number, message, verify = true, timeoutMs = 8000 } = req.body;
     if (!serial || !number || !message) {
       res.status(400).json({ error: 'serial, number, message required' });
       return;
@@ -45,40 +47,68 @@ export function createActionsRoutes(_adb: AdbManager) {
       return;
     }
 
+    const stage = { current: 'start' };
+
     try {
       const cleanNumber = sanitizePhoneNumber(number);
 
-      // 1. 문자 앱 열기 (번호 + 본문 세팅)
-      adbShell(serial, `am start -a android.intent.action.SENDTO -d sms:${cleanNumber}`);
-      sleep(1000);
+      // 1. SMS 앱 실행 (Samsung 기본 메시지 앱 우선, fallback으로 범용 intent)
+      stage.current = 'launch_sms_app';
+      try {
+        adbShell(serial, `am start -a android.intent.action.SENDTO -d sms:${cleanNumber}`);
+      } catch {
+        adbShell(serial, `monkey -p com.samsung.android.messaging -c android.intent.category.LAUNCHER 1`);
+      }
+      sleep(1200);
 
-      // 2. 입력 필드 찾기
-      const elements = getScreen(serial);
-      const inputField = elements.find(e =>
-        e.className.includes('EditText')
+      // 2. 첨부 패널이 열려있으면 닫기 (뒤로가기)
+      stage.current = 'dismiss_panels';
+      const preCheck = getScreen(serial);
+      const hasAttachPanel = preCheck.some(e =>
+        e.text === '카메라' || e.text === '갤러리' || e.text === '음성'
       );
-
-      if (!inputField) {
-        res.status(400).json({ error: 'SMS input field not found. Is the messaging app open?' });
-        return;
+      if (hasAttachPanel) {
+        adbShell(serial, 'input keyevent KEYCODE_BACK');
+        sleep(500);
       }
 
-      // 3. 입력 필드 탭
-      const center = getCenterPoint(inputField.bounds);
-      tap(serial, center.x, center.y);
+      // 3. 입력 필드 찾기 + 포커스
+      stage.current = 'focus_input';
+      const elements = getScreen(serial);
+      const inputField = elements.find(e =>
+        e.className.includes('EditText') &&
+        !e.resourceId.includes('recipient') &&
+        !e.resourceId.includes('to')
+      );
+
+      if (inputField) {
+        const center = getCenterPoint(inputField.bounds);
+        tap(serial, center.x, center.y);
+      } else {
+        // EditText 못 찾으면 하단 입력창 영역 직접 탭 (fallback)
+        tap(serial, 540, 2080);
+      }
       sleep(300);
 
-      // 4. 한글 포함 텍스트 입력 (클립보드 방식)
-      // 폰 클립보드에 텍스트 설정 후 붙여넣기
-      const escaped = message.replace(/'/g, "'\\''");
-      adbShell(serial, `am broadcast -a clipper.set -e text '${escaped}'`);
+      // 4. 기존 입력값 제거
+      adbShell(serial, 'input keyevent KEYCODE_MOVE_END');
+      adbShell(serial, 'input keyevent --longpress KEYCODE_DEL');
       sleep(200);
-      // ADBKeyboard 방식 (fallback)
-      const base64 = Buffer.from(message, 'utf-8').toString('base64');
-      adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
+
+      // 5. 메시지 입력 (한글 지원: broadcast_b64 우선)
+      stage.current = 'type_message';
+      const isAsciiOnly = /^[\x20-\x7E]*$/.test(message);
+      if (isAsciiOnly) {
+        const clean = message.replace(/'/g, "'\\''").replace(/ /g, '%s');
+        adbShell(serial, `input text '${clean}'`);
+      } else {
+        const base64 = Buffer.from(message, 'utf-8').toString('base64');
+        adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
+      }
       sleep(500);
 
-      // 5. 전송 버튼 찾기 + 탭
+      // 6. 전송 버튼 탐지 + 탭
+      stage.current = 'send_tap';
       const elements2 = getScreen(serial);
       const sendBtn = elements2.find(e =>
         e.contentDesc.includes('보내기') || e.contentDesc.includes('전송') || e.contentDesc.includes('Send') ||
@@ -89,21 +119,71 @@ export function createActionsRoutes(_adb: AdbManager) {
       if (sendBtn) {
         const sendCenter = getCenterPoint(sendBtn.bounds);
         tap(serial, sendCenter.x, sendCenter.y);
-        sleep(500);
+      } else {
+        // 전송 버튼 못 찾으면 우측 하단 전송 아이콘 좌표 fallback → 그래도 안 되면 Enter
+        tap(serial, 1015, 2080);
+        sleep(200);
+        adbShell(serial, 'input keyevent 66');
+      }
+      sleep(500);
 
-        // 6. 검증 — 메시지 앱에서 전송 확인
+      // 7. 검증
+      if (!verify) {
+        res.json({
+          status: 'sent', number: cleanNumber, message,
+          verified: false, method: 'ui-compose-noverify',
+        });
+        return;
+      }
+
+      stage.current = 'verify';
+      const deadline = Date.now() + Math.min(timeoutMs, 15000);
+      let verified = false;
+      const snippet = message.substring(0, 20);
+
+      while (Date.now() < deadline) {
+        sleep(500);
         const elements3 = getScreen(serial);
         const texts = elements3.filter(e => e.text).map(e => e.text);
-        const sent = texts.some(t => t.includes(message.substring(0, 20)));
+        if (texts.some(t => t.includes(snippet))) {
+          verified = true;
+          break;
+        }
+      }
 
-        res.json({ status: sent ? 'sent' : 'sent_unverified', number: cleanNumber, message });
+      if (verified) {
+        res.json({
+          status: 'sent', number: cleanNumber, message,
+          verified: true, method: 'ui-compose+verify',
+        });
       } else {
-        // 전송 버튼 못 찾으면 Enter로 시도
+        // 1회 재시도: 전송 버튼 다시 탭
+        stage.current = 'retry_send';
         adbShell(serial, 'input keyevent 66');
-        res.json({ status: 'sent_via_enter', number: cleanNumber, message });
+        sleep(1000);
+
+        const elements4 = getScreen(serial);
+        const texts2 = elements4.filter(e => e.text).map(e => e.text);
+        const retryVerified = texts2.some(t => t.includes(snippet));
+
+        if (retryVerified) {
+          res.json({
+            status: 'sent', number: cleanNumber, message,
+            verified: true, method: 'ui-compose+verify+retry',
+          });
+        } else {
+          res.status(409).json({
+            status: 'failed', stage: 'verify',
+            error: 'Message not observed on screen within timeout',
+            number: cleanNumber, message, verified: false,
+          });
+        }
       }
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        status: 'failed', stage: stage.current,
+        error: error.message, verified: false,
+      });
     }
   });
 
