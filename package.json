@@ -5,7 +5,7 @@
   "main": "dist/main/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc && npx shx cp src/renderer/index.html dist/renderer/index.html",
+    "build": "tsc && npx shx mkdir -p dist/renderer && npx shx cp src/renderer/index.html dist/renderer/index.html",
     "start": "npm run build && electron .",
     "dev": "tsc && npx shx cp src/renderer/index.html dist/renderer/index.html && electron .",
     "build:win": "electron-builder --win",
