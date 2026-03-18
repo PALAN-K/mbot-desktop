@@ -169,5 +169,143 @@ export function createActionsRoutes(_adb: AdbManager) {
     }
   });
 
+  /**
+   * POST /api/do — 범용 액션 시퀀스 실행 + 검증
+   *
+   * 여러 단계를 원자적으로 실행하고 결과를 검증합니다.
+   * 앱별 API 없이 어떤 앱이든 제어 가능.
+   *
+   * body: {
+   *   serial: string,
+   *   steps: [
+   *     { action: "find", text: "내폰모음", tap: true },
+   *     { action: "sleep", ms: 500 },
+   *     { action: "find", text: "EditText", tap: true, by: "class" },
+   *     { action: "type", text: "안녕하세요" },
+   *     { action: "find", text: "전송", tap: true },
+   *   ],
+   *   verify?: { text: "안녕하세요", timeout?: 3000 }
+   * }
+   */
+  router.post('/do', async (req, res) => {
+    const { serial, steps, verify } = req.body;
+    if (!serial || !Array.isArray(steps) || steps.length === 0) {
+      res.status(400).json({ error: 'serial, steps[] required' });
+      return;
+    }
+    if (steps.length > 20) {
+      res.status(400).json({ error: 'max 20 steps' });
+      return;
+    }
+
+    const log: { step: number; action: string; result: string }[] = [];
+
+    try {
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+
+        switch (step.action) {
+          case 'find': {
+            const elements = getScreen(serial);
+            let found;
+            if (step.by === 'class') {
+              found = elements.find(e => e.className.includes(step.text));
+            } else if (step.by === 'id') {
+              found = elements.find(e => e.resourceId.includes(step.text));
+            } else if (step.by === 'desc') {
+              found = elements.find(e => e.contentDesc.includes(step.text));
+            } else {
+              found = findByText(elements, step.text);
+            }
+            if (!found) {
+              log.push({ step: i, action: 'find', result: `not found: ${step.text}` });
+              if (step.optional) continue;
+              res.json({ success: false, failedAt: i, reason: `"${step.text}" not found`, log });
+              return;
+            }
+            if (step.tap) {
+              const c = getCenterPoint(found.bounds);
+              tap(serial, c.x, c.y);
+              log.push({ step: i, action: 'find+tap', result: `${step.text} at ${c.x},${c.y}` });
+            } else {
+              log.push({ step: i, action: 'find', result: `found: ${found.text || found.className}` });
+            }
+            break;
+          }
+          case 'tap': {
+            tap(serial, sanitizeCoord(step.x), sanitizeCoord(step.y));
+            log.push({ step: i, action: 'tap', result: `${step.x},${step.y}` });
+            break;
+          }
+          case 'type': {
+            if (!step.text) break;
+            // ADB broadcast로 한글 포함 텍스트 입력
+            const base64 = Buffer.from(step.text, 'utf-8').toString('base64');
+            adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
+            log.push({ step: i, action: 'type', result: step.text.substring(0, 30) });
+            break;
+          }
+          case 'keyevent': {
+            adbShell(serial, `input keyevent ${step.keycode || 66}`);
+            log.push({ step: i, action: 'keyevent', result: `${step.keycode || 66}` });
+            break;
+          }
+          case 'swipe': {
+            const x1 = step.x1 || 540, y1 = step.y1 || 1500;
+            const x2 = step.x2 || 540, y2 = step.y2 || 500;
+            adbShell(serial, `input swipe ${x1} ${y1} ${x2} ${y2} ${step.duration || 300}`);
+            log.push({ step: i, action: 'swipe', result: 'ok' });
+            break;
+          }
+          case 'launch': {
+            if (step.package) {
+              adbShell(serial, `monkey -p ${step.package} -c android.intent.category.LAUNCHER 1`);
+              log.push({ step: i, action: 'launch', result: step.package });
+            }
+            break;
+          }
+          case 'back': {
+            adbShell(serial, 'input keyevent KEYCODE_BACK');
+            log.push({ step: i, action: 'back', result: 'ok' });
+            break;
+          }
+          case 'sleep': {
+            sleep(step.ms || 500);
+            log.push({ step: i, action: 'sleep', result: `${step.ms || 500}ms` });
+            break;
+          }
+          default:
+            log.push({ step: i, action: step.action, result: 'unknown action, skipped' });
+        }
+      }
+
+      // 검증 단계
+      if (verify?.text) {
+        const timeout = Math.min(verify.timeout || 3000, 10000);
+        const startTime = Date.now();
+        let verified = false;
+
+        while (Date.now() - startTime < timeout) {
+          const elements = getScreen(serial);
+          const texts = elements.filter(e => e.text).map(e => e.text);
+          if (texts.some(t => t.includes(verify.text))) {
+            verified = true;
+            break;
+          }
+          sleep(500);
+        }
+
+        res.json({ success: verified, log, verified, verifyText: verify.text });
+      } else {
+        // 검증 없으면 최종 화면 텍스트 반환
+        const elements = getScreen(serial);
+        const texts = elements.filter(e => e.text).map(e => e.text);
+        res.json({ success: true, log, screen: texts });
+      }
+    } catch (error: any) {
+      res.json({ success: false, error: error.message, log });
+    }
+  });
+
   return router;
 }

@@ -82,29 +82,85 @@ export function startApiServer(options: ApiServerOptions) {
       server: `http://${localIP}:${port}`,
       auth: `Bearer ${token}`,
       devices: serials,
-      guide: `You can control Android phones connected to this PC. Use these 5 APIs to control ANY app — read the screen, tap, swipe, and navigate. No app-specific APIs needed.`,
+      guide: `You can control Android phones connected to this PC. Use /api/do to run multi-step actions atomically with verification. No app-specific APIs needed — works with ANY app.`,
       apis: [
         {
+          method: 'POST', path: '/api/do',
+          desc: 'RECOMMENDED: Run a sequence of actions atomically with optional verification. Replaces all app-specific APIs.',
+          body: {
+            serial: 'string',
+            steps: [
+              '{ action: "launch", package: "com.kakao.talk" }',
+              '{ action: "sleep", ms: 1000 }',
+              '{ action: "find", text: "target text", tap: true }',
+              '{ action: "find", text: "EditText", tap: true, by: "class" }',
+              '{ action: "type", text: "message" }',
+              '{ action: "find", text: "전송", tap: true }',
+              '{ action: "back" }',
+              '{ action: "swipe", x1: 540, y1: 1500, x2: 540, y2: 500 }',
+              '{ action: "keyevent", keycode: 66 }',
+              '{ action: "tap", x: 540, y: 960 }',
+            ],
+            verify: '{ text: "expected text on screen", timeout: 3000 } (optional)',
+          },
+          find_options: {
+            by_text: '{ action: "find", text: "검색" } — default, partial match',
+            by_class: '{ action: "find", text: "EditText", by: "class" } — find by class name',
+            by_id: '{ action: "find", text: "send_btn", by: "id" } — find by resource ID',
+            by_desc: '{ action: "find", text: "전송", by: "desc" } — find by content description',
+            optional: '{ action: "find", text: "닫기", tap: true, optional: true } — skip if not found',
+          },
+          examples: {
+            send_kakao: {
+              desc: 'Open KakaoTalk room and send message with verification',
+              body: {
+                serial: serials[0] || 'SERIAL',
+                steps: [
+                  { action: 'launch', package: 'com.kakao.talk' },
+                  { action: 'sleep', ms: 1000 },
+                  { action: 'find', text: '내폰모음', tap: true },
+                  { action: 'sleep', ms: 500 },
+                  { action: 'find', text: 'EditText', tap: true, by: 'class' },
+                  { action: 'type', text: '안녕하세요' },
+                  { action: 'find', text: '전송', tap: true },
+                ],
+                verify: { text: '안녕하세요', timeout: 3000 },
+              },
+            },
+            navigate_any_app: {
+              desc: 'Generic: open app, find button, tap, verify',
+              body: {
+                serial: serials[0] || 'SERIAL',
+                steps: [
+                  { action: 'launch', package: 'com.example.app' },
+                  { action: 'sleep', ms: 1000 },
+                  { action: 'find', text: 'Login', tap: true },
+                ],
+                verify: { text: 'Welcome', timeout: 5000 },
+              },
+            },
+          },
+        },
+        {
           method: 'GET', path: '/api/screen/text', params: 'serial (query)',
-          desc: 'Read all visible text on screen. Use this FIRST to understand what is on screen.',
+          desc: 'Read all visible text on screen. Use to understand current state.',
           example: `GET /api/screen/text?serial=${serials[0] || 'SERIAL'}`,
         },
         {
           method: 'POST', path: '/api/find', body: { serial: 'string', text: 'string', tap: 'boolean' },
-          desc: 'Find text on screen and optionally tap it. Most useful action — find a button/link by text and tap.',
-          example: { serial: serials[0] || 'SERIAL', text: '검색', tap: true },
+          desc: 'Find text on screen and optionally tap it. For single actions.',
         },
         {
           method: 'POST', path: '/api/tap', body: { serial: 'string', x: 'number', y: 'number' },
-          desc: 'Tap at exact coordinates. Use when find does not work.',
+          desc: 'Tap at exact coordinates.',
         },
         {
           method: 'POST', path: '/api/swipe', body: { serial: 'string', x1: 540, y1: 1500, x2: 540, y2: 500 },
-          desc: 'Swipe/scroll. Default: scroll down.',
+          desc: 'Swipe/scroll.',
         },
         {
           method: 'POST', path: '/api/keyevent', body: { serial: 'string', keycode: 'string' },
-          desc: 'Send key event. Common: KEYCODE_BACK (back), KEYCODE_HOME (home), 66 (enter).',
+          desc: 'Send key event. Common: KEYCODE_BACK, KEYCODE_HOME, 66 (enter).',
         },
         {
           method: 'POST', path: '/api/call', body: { serial: 'string', number: 'string' },
@@ -112,7 +168,7 @@ export function startApiServer(options: ApiServerOptions) {
         },
         {
           method: 'POST', path: '/api/launch', body: { serial: 'string', package: 'string' },
-          desc: 'Launch an app. Example packages: com.kakao.talk, com.naver.app, com.android.chrome',
+          desc: 'Launch app. e.g. com.kakao.talk, com.naver.app',
         },
       ],
       pc_apis: [
@@ -162,9 +218,11 @@ export function startApiServer(options: ApiServerOptions) {
         },
       ],
       pattern: [
-        '--- Phone Control ---',
+        '--- Phone Control (BEST) ---',
+        '1. POST /api/do — run steps + verify in ONE call (recommended for multi-step tasks)',
+        '--- Phone Control (Simple) ---',
         '1. GET /api/screen/text — read phone screen',
-        '2. POST /api/find with tap:true — find and tap target',
+        '2. POST /api/find with tap:true — find and tap',
         '3. GET /api/screen/text — verify result',
         '--- PC Control ---',
         '1. GET /api/pc/screenshot/file — see PC screen',
