@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html><body>
+<canvas id="c" width="256" height="256"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+
+// Background
+ctx.fillStyle = '#16213e';
+ctx.beginPath();
+ctx.roundRect(0, 0, 256, 256, 48);
+ctx.fill();
+
+// Phone outline
+ctx.strokeStyle = '#53c28b';
+ctx.lineWidth = 7;
+ctx.beginPath();
+ctx.roundRect(44, 32, 104, 180, 16);
+ctx.stroke();
+
+// Phone home button
+ctx.fillStyle = '#53c28b';
+ctx.beginPath();
+ctx.arc(96, 190, 7, 0, Math.PI * 2);
+ctx.fill();
+
+// PC screen
+ctx.fillStyle = '#0d1117';
+ctx.strokeStyle = '#4a9eff';
+ctx.lineWidth = 5;
+ctx.beginPath();
+ctx.roundRect(124, 76, 96, 100, 10);
+ctx.fill();
+ctx.stroke();
+
+// PC stand
+ctx.fillStyle = '#4a9eff';
+ctx.fillRect(156, 176, 32, 6);
+ctx.fillRect(148, 182, 48, 4);
+
+// Screen lines
+ctx.strokeStyle = '#4a9eff';
+ctx.lineWidth = 3;
+ctx.lineCap = 'round';
+[100, 118, 136].forEach((y, i) => {
+  ctx.beginPath();
+  ctx.moveTo(142, y);
+  ctx.lineTo(202 - i * 12, y);
+  ctx.stroke();
+});
+
+// Connection arrow
+ctx.strokeStyle = '#53c28b';
+ctx.lineWidth = 4;
+ctx.setLineDash([6, 4]);
+ctx.beginPath();
+ctx.moveTo(108, 100);
+ctx.lineTo(130, 115);
+ctx.stroke();
+
+// Download
+const a = document.createElement('a');
+a.download = 'icon.png';
+a.href = c.toDataURL('image/png');
+a.textContent = 'Download icon.png';
+document.body.appendChild(a);
+</script>
+</body></html>

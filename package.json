@@ -1,0 +1,99 @@
+{
+  "name": "mbot-desktop",
+  "version": "1.0.0",
+  "description": "mbot Desktop — AI Agent Hub for Multi-Phone Control",
+  "main": "dist/main/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && npx shx cp src/renderer/index.html dist/renderer/index.html",
+    "start": "npm run build && electron .",
+    "dev": "tsc && npx shx cp src/renderer/index.html dist/renderer/index.html && electron .",
+    "build:win": "electron-builder --win",
+    "dist": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.palank.mbot-desktop",
+    "productName": "mbot Desktop",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility"
+    },
+    "artifactName": "mbot-Desktop-Setup.${ext}",
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": null,
+      "uninstallerIcon": null,
+      "shortcutName": "mbot Desktop",
+      "uninstallDisplayName": "mbot Desktop"
+    }
+  },
+  "keywords": [
+    "scrcpy",
+    "adb",
+    "mirroring",
+    "android"
+  ],
+  "author": "Palank",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "@types/uuid": "^10.0.0",
+    "@yume-chan/fetch-scrcpy-server": "^1.0.0",
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1",
+    "shx": "^0.4.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "@yume-chan/adb": "^2.5.1",
+    "@yume-chan/adb-scrcpy": "^2.3.2",
+    "@yume-chan/adb-server-node-tcp": "^2.5.2",
+    "@yume-chan/scrcpy": "^2.3.0",
+    "@yume-chan/scrcpy-decoder-webcodecs": "^2.5.0",
+    "@yume-chan/stream-extra": "^2.1.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "uuid": "^13.0.0"
+  }
+}

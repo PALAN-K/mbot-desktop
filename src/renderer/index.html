@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mbot Desktop</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+      background: #111827;
+      color: #e5e7eb;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header {
+      background: #1f2937;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #374151;
+      -webkit-app-region: drag;
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f9fafb;
+      letter-spacing: -0.3px;
+    }
+    header h1 span { color: #60a5fa; }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      -webkit-app-region: no-drag;
+    }
+    .device-count {
+      font-size: 12px;
+      color: #9ca3af;
+      background: #374151;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    /* Main */
+    main { padding: 20px 24px; }
+
+    /* Section */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #6b7280;
+      margin-bottom: 12px;
+    }
+
+    /* Device Cards */
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .device-card {
+      background: #1f2937;
+      border-radius: 14px;
+      padding: 18px;
+      border: 1px solid #374151;
+      transition: border-color 0.2s;
+    }
+    .device-card:hover { border-color: #4b5563; }
+    .device-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .device-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f9fafb;
+    }
+    .device-status {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .status-connected { background: #065f46; color: #6ee7b7; }
+    .status-wireless { background: #1e3a5f; color: #93c5fd; }
+    .device-meta {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 14px;
+    }
+    .device-meta span { color: #6b7280; }
+
+    /* Action Buttons */
+    .device-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+      color: #fff;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      padding: 8px 20px;
+      font-size: 13px;
+    }
+    .btn-primary:hover { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+
+    .btn-secondary {
+      background: #374151;
+      color: #d1d5db;
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+    .btn-secondary:hover { background: #4b5563; }
+
+    .btn-ghost {
+      background: transparent;
+      color: #9ca3af;
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+    .btn-ghost:hover { background: #374151; color: #d1d5db; }
+
+    .btn-header {
+      background: #374151;
+      color: #d1d5db;
+      font-size: 12px;
+      padding: 6px 14px;
+    }
+    .btn-header:hover { background: #4b5563; }
+
+    /* Nearby Section */
+    .nearby-section { margin-top: 28px; }
+    .nearby-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .discover-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px;
+    }
+    .discover-card {
+      background: #1f2937;
+      border: 1px dashed #374151;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .discover-info h4 {
+      font-size: 13px;
+      color: #d1d5db;
+      font-weight: 500;
+    }
+    .discover-info p {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+    .discover-empty {
+      font-size: 13px;
+      color: #6b7280;
+      padding: 16px;
+      text-align: center;
+      background: #1f2937;
+      border-radius: 10px;
+      border: 1px dashed #374151;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+    .empty-state h2 {
+      font-size: 16px;
+      color: #9ca3af;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .empty-state p {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.7;
+    }
+
+    /* Onboarding Wizard */
+    .onboarding {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .onboarding-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f9fafb;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .onboarding-subtitle {
+      font-size: 13px;
+      color: #9ca3af;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .usecase-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .usecase-card {
+      background: #1f2937;
+      border: 2px solid #374151;
+      border-radius: 14px;
+      padding: 22px 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .usecase-card:hover { border-color: #4b5563; }
+    .usecase-icon { font-size: 32px; margin-bottom: 10px; }
+    .usecase-card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f9fafb;
+      margin-bottom: 6px;
+    }
+    .usecase-card p {
+      font-size: 12px;
+      color: #9ca3af;
+      line-height: 1.5;
+    }
+
+    /* Guide Steps */
+    .guide-section {
+      background: #1f2937;
+      border-radius: 14px;
+      padding: 24px;
+      border: 1px solid #374151;
+    }
+    .guide-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f9fafb;
+      margin-bottom: 4px;
+    }
+    .guide-desc {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 18px;
+    }
+    .guide-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .guide-tab {
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      background: #374151;
+      color: #9ca3af;
+      border: none;
+    }
+    .guide-tab.active { background: #2563eb; color: #fff; }
+    .step-list { list-style: none; padding: 0; }
+    .step-list li {
+      position: relative;
+      padding: 8px 0 8px 28px;
+      font-size: 13px;
+      color: #d1d5db;
+      line-height: 1.6;
+    }
+    .step-list li::before {
+      content: attr(data-step);
+      position: absolute;
+      left: 0;
+      width: 20px;
+      height: 20px;
+      background: #374151;
+      color: #9ca3af;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      top: 9px;
+    }
+    .step-list li .step-hint {
+      display: block;
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+    .guide-footer {
+      margin-top: 18px;
+      text-align: center;
+    }
+
+    /* Log Panel */
+    .log-toggle {
+      margin-top: 20px;
+      text-align: center;
+    }
+    .log-panel {
+      margin-top: 8px;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 11px;
+      max-height: 150px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+    .log-panel .log-entry { color: #64748b; }
+    .log-panel .log-success { color: #4ade80; }
+    .log-panel .log-error { color: #f87171; }
+
+    /* Update Banner */
+    .update-banner {
+      background: linear-gradient(135deg, #1e3a5f, #1e293b);
+      border-bottom: 1px solid #2563eb;
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #93c5fd;
+      display: none;
+    }
+    .update-banner span { flex: 1; }
+    .update-banner .update-link {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-left: 12px;
+    }
+    .update-banner .update-link:hover { background: #1d4ed8; }
+    .update-banner .update-dismiss {
+      background: none;
+      border: none;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 16px;
+      margin-left: 8px;
+      padding: 0 4px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span>mbot</span> Desktop</h1>
+    <div class="header-right">
+      <span class="device-count" id="statusText">...</span>
+      <button class="btn-header" id="refreshBtn">Refresh</button>
+    </div>
+  </header>
+
+  <div class="update-banner" id="updateBanner">
+    <span id="updateText"></span>
+    <button class="update-link" id="updateBtn">Download</button>
+    <button class="update-dismiss" id="updateDismiss">&times;</button>
+  </div>
+
+  <main>
+    <!-- Connected Devices -->
+    <div class="section-label" id="connectedLabel" style="display:none;">My Devices</div>
+    <div id="deviceGrid" class="device-grid"></div>
+    <div id="emptyState" style="display:none;">
+      <div class="onboarding" id="onboarding">
+        <div class="onboarding-title">Welcome to mbot Desktop</div>
+        <div class="onboarding-subtitle">폰 미러링 + AI 제어를 하나의 화면에서</div>
+
+        <!-- What you can do -->
+        <div class="usecase-cards" style="margin-bottom:20px;">
+          <div class="usecase-card" style="cursor:default; border-color:#374151;">
+            <div class="usecase-icon">📱</div>
+            <h3>Phone Mirror</h3>
+            <p>PC에서 폰 화면 실시간 미러링<br>카카오톡, 앱 자유롭게 사용</p>
+          </div>
+          <div class="usecase-card" style="cursor:default; border-color:#374151;">
+            <div class="usecase-icon">🤖</div>
+            <h3>AI Control</h3>
+            <p>AI가 폰 + PC를 동시 제어<br>텔레그램으로 명령, 자동 실행</p>
+          </div>
+        </div>
+
+        <!-- Connection Guide -->
+        <div class="guide-section">
+          <div class="guide-title">Connect Your Phone</div>
+          <div class="guide-desc">Android 버전에 맞는 방법을 선택하세요</div>
+
+          <div class="guide-tabs">
+            <button class="guide-tab active" onclick="switchGuideTab('wireless', this)">Android 11+ (Wireless)</button>
+            <button class="guide-tab" onclick="switchGuideTab('usb', this)">Android 10 이하 (USB)</button>
+          </div>
+
+          <div id="guideWireless">
+            <ol class="step-list">
+              <li data-step="1">
+                설정 → 개발자 옵션 ON
+                <span class="step-hint">빌드 번호를 7회 탭하면 개발자 옵션이 나타납니다</span>
+              </li>
+              <li data-step="2">
+                무선 디버깅 ON
+                <span class="step-hint">개발자 옵션 → 무선 디버깅 활성화</span>
+              </li>
+              <li data-step="3">
+                아래 Nearby Devices에서 Scan 클릭
+                <span class="step-hint">자동으로 디바이스를 발견합니다</span>
+              </li>
+              <li data-step="4">
+                Connect → Mirror 버튼 클릭
+                <span class="step-hint">연결 즉시 미러링 + AI 제어 모두 사용 가능</span>
+              </li>
+            </ol>
+          </div>
+
+          <div id="guideUsb" style="display:none;">
+            <ol class="step-list">
+              <li data-step="1">
+                설정 → 개발자 옵션 ON
+                <span class="step-hint">빌드 번호를 7회 탭하면 개발자 옵션이 나타납니다</span>
+              </li>
+              <li data-step="2">
+                USB 디버깅 ON
+                <span class="step-hint">개발자 옵션 → USB 디버깅 활성화</span>
+              </li>
+              <li data-step="3">
+                USB 케이블로 PC와 폰 연결
+                <span class="step-hint">폰에서 "USB 디버깅 허용" 팝업이 나오면 허용</span>
+              </li>
+              <li data-step="4">
+                Go Wireless 버튼 클릭 → USB 분리
+                <span class="step-hint">이후 무선으로 자동 연결됩니다</span>
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="guide-footer">
+          <button class="btn-primary" onclick="closeOnboarding()">Start using mbot Desktop</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nearby Devices -->
+    <div class="nearby-section">
+      <div class="nearby-header">
+        <div class="section-label" style="margin:0;">Nearby Devices</div>
+        <button class="btn-ghost" id="scanBtn">Scan</button>
+      </div>
+      <div id="discoverGrid"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="log-toggle">
+      <button class="btn-ghost" id="logToggleBtn" style="display:none;">Show Log</button>
+    </div>
+    <div id="logPanel" class="log-panel" style="display:none;"></div>
+  </main>
+
+  <script>
+    const grid = document.getElementById('deviceGrid');
+    const emptyState = document.getElementById('emptyState');
+    const connectedLabel = document.getElementById('connectedLabel');
+    const statusText = document.getElementById('statusText');
+    const logPanel = document.getElementById('logPanel');
+    const logToggleBtn = document.getElementById('logToggleBtn');
+    const discoverGrid = document.getElementById('discoverGrid');
+
+    const originalTimeouts = {};
+    let connectedSerials = new Set();
+    let logVisible = false;
+    let onboardingDismissed = localStorage.getItem('onboardingDone') === '1';
+
+    // === Onboarding ===
+    function switchGuideTab(tab, btn) {
+      document.querySelectorAll('.guide-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('guideWireless').style.display = tab === 'wireless' ? 'block' : 'none';
+      document.getElementById('guideUsb').style.display = tab === 'usb' ? 'block' : 'none';
+    }
+
+    function closeOnboarding() {
+      onboardingDismissed = true;
+      localStorage.setItem('onboardingDone', '1');
+      emptyState.style.display = 'none';
+      refreshAll();
+    }
+
+    // === Log ===
+    function log(msg, type = 'entry') {
+      logToggleBtn.style.display = 'inline-block';
+      const entry = document.createElement('div');
+      entry.className = `log-${type}`;
+      const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      entry.textContent = `${time}  ${msg}`;
+      logPanel.appendChild(entry);
+      logPanel.scrollTop = logPanel.scrollHeight;
+    }
+
+    logToggleBtn.addEventListener('click', () => {
+      logVisible = !logVisible;
+      logPanel.style.display = logVisible ? 'block' : 'none';
+      logToggleBtn.textContent = logVisible ? 'Hide Log' : 'Show Log';
+    });
+
+    // === Mirror ===
+    async function onMirror(serial) {
+      log(`Starting mirror...`);
+      try {
+        const ok = await window.mbot.startMirror(serial);
+        log(ok ? 'Mirror started' : 'Mirror failed', ok ? 'success' : 'error');
+      } catch (e) {
+        log(`Mirror error: ${e.message}`, 'error');
+      }
+    }
+
+    // === Stability (auto-apply on mirror) ===
+    async function onStability(serial) {
+      try {
+        const result = await window.mbot.setupStability(serial);
+        originalTimeouts[serial] = result.originalTimeout;
+        const ok = result.stayAwake && result.stayOnPlugged;
+        log(`Stability: ${ok ? 'ON' : 'partial'}`, ok ? 'success' : 'entry');
+      } catch (e) {
+        log(`Stability error`, 'error');
+      }
+    }
+
+    // === Go Wireless ===
+    async function onGoWireless(serial) {
+      log('Switching to wireless...');
+      try {
+        const result = await window.mbot.enableWireless(serial);
+        if (result) {
+          log(`Wireless ready (${result.ip}) — USB 분리 가능`, 'success');
+          setTimeout(refreshAll, 2000);
+        } else {
+          log('Wi-Fi 연결을 확인하세요', 'error');
+        }
+      } catch (e) {
+        log(`Wireless error`, 'error');
+      }
+    }
+
+    // === Restore ===
+    async function onRestore(serial) {
+      const timeout = originalTimeouts[serial] || '60000';
+      try {
+        await window.mbot.restoreStability(serial, timeout);
+        log('Settings restored', 'success');
+      } catch (e) {
+        log('Restore failed', 'error');
+      }
+    }
+
+    // === Mirror + Stability combo ===
+    async function onMirrorWithStability(serial) {
+      await onStability(serial);
+      await onMirror(serial);
+    }
+
+    // === Nearby ===
+    async function onScanDevices() {
+      discoverGrid.innerHTML = '<div class="discover-empty">Scanning...</div>';
+      try {
+        const discovered = await window.mbot.discoverDevices();
+        const newDevices = discovered.filter(dev => {
+          const serial = dev.name.replace('adb-', '');
+          return !connectedSerials.has(serial) && !connectedSerials.has(`${dev.ip}:${dev.port}`);
+        });
+
+        if (newDevices.length === 0) {
+          const msg = discovered.length > 0
+            ? 'All nearby devices are already connected.'
+            : 'No devices found. Make sure wireless debugging is ON.';
+          discoverGrid.innerHTML = `<div class="discover-empty">${msg}</div>`;
+          return;
+        }
+
+        discoverGrid.innerHTML = '';
+        for (const dev of newDevices) {
+          const displayName = dev.name.replace('adb-', '').substring(0, 16);
+          const card = document.createElement('div');
+          card.className = 'discover-card';
+          card.innerHTML = `
+            <div class="discover-info">
+              <h4>${displayName}</h4>
+              <p>${dev.ip}</p>
+            </div>
+            <button class="btn-primary" style="padding:6px 14px;font-size:12px;" onclick="onAutoConnect('${dev.ip}', ${dev.port}, this)">Connect</button>
+          `;
+          discoverGrid.appendChild(card);
+        }
+      } catch (e) {
+        discoverGrid.innerHTML = '<div class="discover-empty">Scan failed</div>';
+      }
+    }
+
+    async function onAutoConnect(ip, port, btn) {
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      try {
+        const ok = await window.mbot.connectDevice(ip, port);
+        if (ok) {
+          btn.textContent = 'Connected!';
+          log(`Connected to ${ip}`, 'success');
+          await refreshDevices();
+          setTimeout(onScanDevices, 500);
+        } else {
+          btn.textContent = 'Failed';
+          btn.disabled = false;
+          setTimeout(() => { btn.textContent = 'Connect'; }, 2000);
+        }
+      } catch (e) {
+        btn.textContent = 'Error';
+        btn.disabled = false;
+      }
+    }
+
+    // === Device List ===
+    async function refreshDevices() {
+      const devices = await window.mbot.listDevices();
+      connectedSerials = new Set(devices.map(d => d.serial));
+
+      if (devices.length === 0) {
+        grid.style.display = 'none';
+        connectedLabel.style.display = 'none';
+        emptyState.style.display = 'block';
+        statusText.textContent = 'No devices';
+        return;
+      }
+      emptyState.style.display = 'none';
+
+      grid.style.display = 'grid';
+      connectedLabel.style.display = 'block';
+      emptyState.style.display = 'none';
+      statusText.textContent = `${devices.length} device${devices.length > 1 ? 's' : ''}`;
+      grid.innerHTML = '';
+
+      for (const device of devices) {
+        const info = await window.mbot.getDeviceInfo(device.serial);
+        const isWireless = device.serial.includes(':');
+        const name = info?.model || device.serial;
+        const android = info?.androidVersion || '?';
+
+        const card = document.createElement('div');
+        card.className = 'device-card';
+        card.innerHTML = `
+          <div class="device-header">
+            <div class="device-name">${name}</div>
+            <span class="device-status ${isWireless ? 'status-wireless' : 'status-connected'}">
+              ${isWireless ? 'Wireless' : 'USB'}
+            </span>
+          </div>
+          <div class="device-meta">
+            Android ${android}
+            ${isWireless ? `<span>&middot; ${device.serial.split(':')[0]}</span>` : ''}
+          </div>
+          <div class="device-actions">
+            <button class="btn-primary" onclick="onMirrorWithStability('${device.serial}')">Mirror</button>
+            ${!isWireless ? `<button class="btn-secondary" onclick="onGoWireless('${device.serial}')">Go Wireless</button>` : ''}
+            <button class="btn-ghost" onclick="onRestore('${device.serial}')">Restore</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      }
+    }
+
+    async function refreshAll() {
+      await refreshDevices();
+      await onScanDevices();
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+    document.getElementById('scanBtn').addEventListener('click', onScanDevices);
+
+    refreshAll();
+
+    // === Update Check ===
+    (async function checkUpdate() {
+      try {
+        const update = await window.mbot.checkUpdate();
+        if (update) {
+          document.getElementById('updateText').textContent = `New version v${update.latest} available (current: v${update.current})`;
+          document.getElementById('updateBanner').style.display = 'flex';
+          document.getElementById('updateBtn').onclick = () => window.mbot.openExternal(update.url);
+          document.getElementById('updateDismiss').onclick = () => {
+            document.getElementById('updateBanner').style.display = 'none';
+          };
+        }
+      } catch {}
+    })();
+  </script>
+</body>
+</html>
