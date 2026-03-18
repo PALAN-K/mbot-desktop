@@ -708,18 +708,7 @@
       }
     }
 
-    async function refreshAll() {
-      await refreshDevices();
-      await onScanDevices();
-    }
-
-    document.getElementById('refreshBtn').addEventListener('click', refreshAll);
-    document.getElementById('scanBtn').addEventListener('click', onScanDevices);
-
-    refreshAll();
-
-    // === Update Check ===
-    (async function checkUpdate() {
+    async function checkForUpdate() {
       try {
         const update = await window.mbot.checkUpdate();
         if (update) {
@@ -731,7 +720,21 @@
           };
         }
       } catch {}
-    })();
+    }
+
+    async function refreshAll() {
+      await refreshDevices();
+      await onScanDevices();
+      await checkForUpdate();
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+    document.getElementById('scanBtn').addEventListener('click', onScanDevices);
+
+    refreshAll();
+
+    // === Update Check (on startup) ===
+    checkForUpdate();
   </script>
 </body>
 </html>
