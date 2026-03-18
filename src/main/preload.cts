@@ -12,4 +12,6 @@ contextBridge.exposeInMainWorld('mbot', {
   stopMirror: (serial: string) => ipcRenderer.invoke('device:stopMirror', serial),
   discoverDevices: () => ipcRenderer.invoke('device:discover'),
   inputText: (serial: string, text: string) => ipcRenderer.invoke('device:inputText', serial, text),
+  checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+  openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
 });
