@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('mbot', {
   startMirror: (serial: string) => ipcRenderer.invoke('device:mirror', serial),
   stopMirror: (serial: string) => ipcRenderer.invoke('device:stopMirror', serial),
   discoverDevices: () => ipcRenderer.invoke('device:discover'),
+  removeMdnsCache: (name: string) => ipcRenderer.invoke('device:removeMdnsCache', name),
   inputText: (serial: string, text: string) => ipcRenderer.invoke('device:inputText', serial, text),
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
   installUpdate: () => ipcRenderer.invoke('app:installUpdate'),

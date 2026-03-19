@@ -29,6 +29,8 @@ export class AdbManager {
   private client: AdbServerClient;
   private mirrorProcesses: Map<string, ChildProcess> = new Map();
   private keyboardConfigured: Set<string> = new Set();
+  /** mDNS 캐시: name → MdnsDevice (한번 잡히면 유지) */
+  private mdnsCache: Map<string, MdnsDevice> = new Map();
 
   constructor(host = 'localhost', port = 5037) {
     this.connector = new AdbServerNodeTcpConnector({ host, port });
@@ -252,33 +254,39 @@ export class AdbManager {
   }
 
 
-  /** mDNS로 주변 ADB 디바이스 자동 탐색 */
+  /** mDNS로 주변 ADB 디바이스 자동 탐색 (캐시 병합) */
   async discoverDevices(): Promise<MdnsDevice[]> {
     try {
       const output = execSync('adb mdns services', { timeout: 5000 }).toString();
-      const devices: MdnsDevice[] = [];
       const lines = output.split('\n');
 
       for (const line of lines) {
         // 형식: adb-SERIAL	_adb._tcp	IP:PORT
         // 또는: adb-SERIAL	_adb-tls-connect._tcp	IP:PORT
-        const match = line.match(/^(\S+)\s+(_adb[^	\s]*)\s+(\d+\.\d+\.\d+\.\d+):(\d+)/);
+        const match = line.match(/^(\S+)\s+(_adb[^\t\s]*)\s+(\d+\.\d+\.\d+\.\d+):(\d+)/);
         if (match) {
-          devices.push({
+          const device: MdnsDevice = {
             name: match[1],
             service: match[2],
             ip: match[3],
             port: parseInt(match[4]),
-          });
+          };
+          // 캐시에 저장/갱신 (IP가 바뀔 수 있으므로 항상 최신으로)
+          this.mdnsCache.set(device.name, device);
         }
       }
-
-      console.log(`[mDNS] Found ${devices.length} device(s)`);
-      return devices;
     } catch (error) {
       console.error('[mDNS] Discovery error:', error);
-      return [];
     }
+
+    const devices = Array.from(this.mdnsCache.values());
+    console.log(`[mDNS] Returning ${devices.length} device(s) (cached)`);
+    return devices;
+  }
+
+  /** 캐시에서 특정 기기 제거 (연결 실패 시 호출) */
+  removeMdnsCache(name: string): void {
+    this.mdnsCache.delete(name);
   }
 
   /** 발견된 디바이스에 자동 연결 시도 */

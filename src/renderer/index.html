@@ -629,7 +629,7 @@
               <h4>${displayName}</h4>
               <p>${dev.ip}</p>
             </div>
-            <button class="btn-primary" style="padding:6px 14px;font-size:12px;" onclick="onAutoConnect('${dev.ip}', ${dev.port}, this)">연결</button>
+            <button class="btn-primary" style="padding:6px 14px;font-size:12px;" onclick="onAutoConnect('${dev.ip}', ${dev.port}, '${dev.name}', this)">연결</button>
           `;
           discoverGrid.appendChild(card);
         }
@@ -638,7 +638,7 @@
       }
     }
 
-    async function onAutoConnect(ip, port, btn) {
+    async function onAutoConnect(ip, port, deviceName, btn) {
       btn.disabled = true;
       btn.textContent = '연결 중...';
       try {
@@ -651,11 +651,14 @@
         } else {
           btn.textContent = '실패';
           btn.disabled = false;
+          // 연결 실패 시 캐시에서 제거 (IP/포트 변경됐을 가능성)
+          if (deviceName) await window.mbot.removeMdnsCache(deviceName);
           setTimeout(() => { btn.textContent = '연결'; }, 2000);
         }
       } catch (e) {
         btn.textContent = '오류';
         btn.disabled = false;
+        if (deviceName) await window.mbot.removeMdnsCache(deviceName);
       }
     }
 

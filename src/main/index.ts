@@ -77,6 +77,10 @@ async function initAdb() {
     return adbManager!.discoverDevices();
   });
 
+  ipcMain.handle('device:removeMdnsCache', async (_event, name: string) => {
+    adbManager!.removeMdnsCache(name);
+  });
+
   ipcMain.handle('app:openExternal', async (_event, url: string) => {
     await shell.openExternal(url);
   });
