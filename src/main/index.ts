@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { autoUpdater } from 'electron-updater';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 import { AdbManager } from './adb/AdbManager.js';
 import { startApiServer } from './api/server.js';
 
