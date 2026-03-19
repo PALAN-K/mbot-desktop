@@ -59,6 +59,33 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f | head -20
 
+      - name: Upload to Cloudflare R2
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.R2_ACCESS_KEY }}
+          aws configure set aws_secret_access_key ${{ secrets.R2_SECRET_KEY }}
+          aws configure set default.region auto
+
+          for file in artifacts/mbot-Desktop-Setup.*; do
+            [ -f "$file" ] || continue
+            filename=$(basename "$file")
+            # blockmap 등 불필요 파일 제외
+            case "$filename" in
+              *.blockmap|*.yml|*.yaml) continue ;;
+            esac
+            echo "Uploading $filename to R2..."
+            aws s3 cp "$file" "s3://pocketserver-apk/$filename" \
+              --endpoint-url "${{ secrets.R2_ENDPOINT }}" \
+              --content-type "application/octet-stream"
+            echo "Done: $filename"
+          done
+
+      - name: Verify R2 uploads
+        run: |
+          for ext in exe dmg AppImage; do
+            status=$(curl -sI "https://pub-832ccadf097e4bf687650db1e57df66b.r2.dev/mbot-Desktop-Setup.$ext" | head -1)
+            echo "mbot-Desktop-Setup.$ext → $status"
+          done
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

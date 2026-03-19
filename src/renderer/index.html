@@ -391,46 +391,46 @@
     <h1><span>mbot</span> Desktop</h1>
     <div class="header-right">
       <span class="device-count" id="statusText">...</span>
-      <button class="btn-header" id="refreshBtn">Refresh</button>
+      <button class="btn-header" id="refreshBtn">새로고침</button>
     </div>
   </header>
 
   <div class="update-banner" id="updateBanner">
     <span id="updateText"></span>
-    <button class="update-link" id="updateBtn">Download</button>
+    <button class="update-link" id="updateBtn">다운로드</button>
     <button class="update-dismiss" id="updateDismiss">&times;</button>
   </div>
 
   <main>
     <!-- Connected Devices -->
-    <div class="section-label" id="connectedLabel" style="display:none;">My Devices</div>
+    <div class="section-label" id="connectedLabel" style="display:none;">내 기기</div>
     <div id="deviceGrid" class="device-grid"></div>
     <div id="emptyState" style="display:none;">
       <div class="onboarding" id="onboarding">
-        <div class="onboarding-title">Welcome to mbot Desktop</div>
+        <div class="onboarding-title">mbot Desktop에 오신 것을 환영합니다</div>
         <div class="onboarding-subtitle">폰 미러링 + AI 제어를 하나의 화면에서</div>
 
         <!-- What you can do -->
         <div class="usecase-cards" style="margin-bottom:20px;">
           <div class="usecase-card" style="cursor:default; border-color:#374151;">
             <div class="usecase-icon">📱</div>
-            <h3>Phone Mirror</h3>
+            <h3>폰 미러링</h3>
             <p>PC에서 폰 화면 실시간 미러링<br>카카오톡, 앱 자유롭게 사용</p>
           </div>
           <div class="usecase-card" style="cursor:default; border-color:#374151;">
             <div class="usecase-icon">🤖</div>
-            <h3>AI Control</h3>
+            <h3>AI 제어</h3>
             <p>AI가 폰 + PC를 동시 제어<br>텔레그램으로 명령, 자동 실행</p>
           </div>
         </div>
 
         <!-- Connection Guide -->
         <div class="guide-section">
-          <div class="guide-title">Connect Your Phone</div>
+          <div class="guide-title">폰 연결하기</div>
           <div class="guide-desc">Android 버전에 맞는 방법을 선택하세요</div>
 
           <div class="guide-tabs">
-            <button class="guide-tab active" onclick="switchGuideTab('wireless', this)">Android 11+ (Wireless)</button>
+            <button class="guide-tab active" onclick="switchGuideTab('wireless', this)">Android 11+ (무선)</button>
             <button class="guide-tab" onclick="switchGuideTab('usb', this)">Android 10 이하 (USB)</button>
           </div>
 
@@ -445,11 +445,11 @@
                 <span class="step-hint">개발자 옵션 → 무선 디버깅 활성화</span>
               </li>
               <li data-step="3">
-                아래 Nearby Devices에서 Scan 클릭
+                아래 주변 기기에서 검색 클릭
                 <span class="step-hint">자동으로 디바이스를 발견합니다</span>
               </li>
               <li data-step="4">
-                Connect → Mirror 버튼 클릭
+                연결 → 미러링 버튼 클릭
                 <span class="step-hint">연결 즉시 미러링 + AI 제어 모두 사용 가능</span>
               </li>
             </ol>
@@ -470,7 +470,7 @@
                 <span class="step-hint">폰에서 "USB 디버깅 허용" 팝업이 나오면 허용</span>
               </li>
               <li data-step="4">
-                Go Wireless 버튼 클릭 → USB 분리
+                무선 전환 버튼 클릭 → USB 분리
                 <span class="step-hint">이후 무선으로 자동 연결됩니다</span>
               </li>
             </ol>
@@ -478,7 +478,7 @@
         </div>
 
         <div class="guide-footer">
-          <button class="btn-primary" onclick="closeOnboarding()">Start using mbot Desktop</button>
+          <button class="btn-primary" onclick="closeOnboarding()">mbot Desktop 시작하기</button>
         </div>
       </div>
     </div>
@@ -486,15 +486,15 @@
     <!-- Nearby Devices -->
     <div class="nearby-section">
       <div class="nearby-header">
-        <div class="section-label" style="margin:0;">Nearby Devices</div>
-        <button class="btn-ghost" id="scanBtn">Scan</button>
+        <div class="section-label" style="margin:0;">주변 기기</div>
+        <button class="btn-ghost" id="scanBtn">검색</button>
       </div>
       <div id="discoverGrid"></div>
     </div>
 
     <!-- Log -->
     <div class="log-toggle">
-      <button class="btn-ghost" id="logToggleBtn" style="display:none;">Show Log</button>
+      <button class="btn-ghost" id="logToggleBtn" style="display:none;">로그 보기</button>
     </div>
     <div id="logPanel" class="log-panel" style="display:none;"></div>
   </main>
@@ -542,17 +542,17 @@
     logToggleBtn.addEventListener('click', () => {
       logVisible = !logVisible;
       logPanel.style.display = logVisible ? 'block' : 'none';
-      logToggleBtn.textContent = logVisible ? 'Hide Log' : 'Show Log';
+      logToggleBtn.textContent = logVisible ? '로그 숨기기' : '로그 보기';
     });
 
     // === Mirror ===
     async function onMirror(serial) {
-      log(`Starting mirror...`);
+      log(`미러링 시작 중...`);
       try {
         const ok = await window.mbot.startMirror(serial);
-        log(ok ? 'Mirror started' : 'Mirror failed', ok ? 'success' : 'error');
+        log(ok ? '미러링 시작됨' : '미러링 실패', ok ? 'success' : 'error');
       } catch (e) {
-        log(`Mirror error: ${e.message}`, 'error');
+        log(`미러링 오류: ${e.message}`, 'error');
       }
     }
 
@@ -562,25 +562,25 @@
         const result = await window.mbot.setupStability(serial);
         originalTimeouts[serial] = result.originalTimeout;
         const ok = result.stayAwake && result.stayOnPlugged;
-        log(`Stability: ${ok ? 'ON' : 'partial'}`, ok ? 'success' : 'entry');
+        log(`안정성 설정: ${ok ? '완료' : '일부 적용'}`, ok ? 'success' : 'entry');
       } catch (e) {
-        log(`Stability error`, 'error');
+        log(`안정성 설정 오류`, 'error');
       }
     }
 
     // === Go Wireless ===
     async function onGoWireless(serial) {
-      log('Switching to wireless...');
+      log('무선 전환 중...');
       try {
         const result = await window.mbot.enableWireless(serial);
         if (result) {
-          log(`Wireless ready (${result.ip}) — USB 분리 가능`, 'success');
+          log(`무선 연결 완료 (${result.ip}) — USB 분리 가능`, 'success');
           setTimeout(refreshAll, 2000);
         } else {
           log('Wi-Fi 연결을 확인하세요', 'error');
         }
       } catch (e) {
-        log(`Wireless error`, 'error');
+        log(`무선 전환 오류`, 'error');
       }
     }
 
@@ -589,9 +589,9 @@
       const timeout = originalTimeouts[serial] || '60000';
       try {
         await window.mbot.restoreStability(serial, timeout);
-        log('Settings restored', 'success');
+        log('설정 복원 완료', 'success');
       } catch (e) {
-        log('Restore failed', 'error');
+        log('설정 복원 실패', 'error');
       }
     }
 
@@ -603,7 +603,7 @@
 
     // === Nearby ===
     async function onScanDevices() {
-      discoverGrid.innerHTML = '<div class="discover-empty">Scanning...</div>';
+      discoverGrid.innerHTML = '<div class="discover-empty">검색 중...</div>';
       try {
         const discovered = await window.mbot.discoverDevices();
         const newDevices = discovered.filter(dev => {
@@ -613,8 +613,8 @@
 
         if (newDevices.length === 0) {
           const msg = discovered.length > 0
-            ? 'All nearby devices are already connected.'
-            : 'No devices found. Make sure wireless debugging is ON.';
+            ? '주변 기기가 모두 연결되어 있습니다.'
+            : '기기를 찾을 수 없습니다. 무선 디버깅이 켜져 있는지 확인하세요.';
           discoverGrid.innerHTML = `<div class="discover-empty">${msg}</div>`;
           return;
         }
@@ -629,32 +629,32 @@
               <h4>${displayName}</h4>
               <p>${dev.ip}</p>
             </div>
-            <button class="btn-primary" style="padding:6px 14px;font-size:12px;" onclick="onAutoConnect('${dev.ip}', ${dev.port}, this)">Connect</button>
+            <button class="btn-primary" style="padding:6px 14px;font-size:12px;" onclick="onAutoConnect('${dev.ip}', ${dev.port}, this)">연결</button>
           `;
           discoverGrid.appendChild(card);
         }
       } catch (e) {
-        discoverGrid.innerHTML = '<div class="discover-empty">Scan failed</div>';
+        discoverGrid.innerHTML = '<div class="discover-empty">검색 실패</div>';
       }
     }
 
     async function onAutoConnect(ip, port, btn) {
       btn.disabled = true;
-      btn.textContent = 'Connecting...';
+      btn.textContent = '연결 중...';
       try {
         const ok = await window.mbot.connectDevice(ip, port);
         if (ok) {
-          btn.textContent = 'Connected!';
-          log(`Connected to ${ip}`, 'success');
+          btn.textContent = '연결됨!';
+          log(`${ip} 연결 완료`, 'success');
           await refreshDevices();
           setTimeout(onScanDevices, 500);
         } else {
-          btn.textContent = 'Failed';
+          btn.textContent = '실패';
           btn.disabled = false;
-          setTimeout(() => { btn.textContent = 'Connect'; }, 2000);
+          setTimeout(() => { btn.textContent = '연결'; }, 2000);
         }
       } catch (e) {
-        btn.textContent = 'Error';
+        btn.textContent = '오류';
         btn.disabled = false;
       }
     }
@@ -668,7 +668,7 @@
         grid.style.display = 'none';
         connectedLabel.style.display = 'none';
         emptyState.style.display = 'block';
-        statusText.textContent = 'No devices';
+        statusText.textContent = '기기 없음';
         return;
       }
       emptyState.style.display = 'none';
@@ -676,7 +676,7 @@
       grid.style.display = 'grid';
       connectedLabel.style.display = 'block';
       emptyState.style.display = 'none';
-      statusText.textContent = `${devices.length} device${devices.length > 1 ? 's' : ''}`;
+      statusText.textContent = `${devices.length}대 연결됨`;
       grid.innerHTML = '';
 
       for (const device of devices) {
@@ -691,7 +691,7 @@
           <div class="device-header">
             <div class="device-name">${name}</div>
             <span class="device-status ${isWireless ? 'status-wireless' : 'status-connected'}">
-              ${isWireless ? 'Wireless' : 'USB'}
+              ${isWireless ? '무선' : 'USB'}
             </span>
           </div>
           <div class="device-meta">
@@ -699,9 +699,9 @@
             ${isWireless ? `<span>&middot; ${device.serial.split(':')[0]}</span>` : ''}
           </div>
           <div class="device-actions">
-            <button class="btn-primary" onclick="onMirrorWithStability('${device.serial}')">Mirror</button>
-            ${!isWireless ? `<button class="btn-secondary" onclick="onGoWireless('${device.serial}')">Go Wireless</button>` : ''}
-            <button class="btn-ghost" onclick="onRestore('${device.serial}')">Restore</button>
+            <button class="btn-primary" onclick="onMirrorWithStability('${device.serial}')">미러링</button>
+            ${!isWireless ? `<button class="btn-secondary" onclick="onGoWireless('${device.serial}')">무선 전환</button>` : ''}
+            <button class="btn-ghost" onclick="onRestore('${device.serial}')">설정 복원</button>
           </div>
         `;
         grid.appendChild(card);
@@ -712,7 +712,7 @@
       try {
         const update = await window.mbot.checkUpdate();
         if (update) {
-          document.getElementById('updateText').textContent = `New version v${update.latest} available (current: v${update.current})`;
+          document.getElementById('updateText').textContent = `새 버전 v${update.latest} 사용 가능 (현재: v${update.current})`;
           document.getElementById('updateBanner').style.display = 'flex';
           document.getElementById('updateBtn').onclick = () => window.mbot.openExternal(update.url);
           document.getElementById('updateDismiss').onclick = () => {

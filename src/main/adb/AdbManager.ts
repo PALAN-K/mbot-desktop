@@ -209,7 +209,7 @@ export class AdbManager {
 
       const proc = spawn('scrcpy', [
         '-s', serial,
-        '--window-title', `mbot Mirror - ${serial}`,
+        '--window-title', `mbot 미러링 - ${serial}`,
         '--stay-awake',
         '--turn-screen-off',
         '--window-width', '400',
