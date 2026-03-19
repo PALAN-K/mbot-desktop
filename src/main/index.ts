@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { autoUpdater } from 'electron-updater';
 import { AdbManager } from './adb/AdbManager.js';
 import { startApiServer } from './api/server.js';
 
@@ -75,25 +76,16 @@ async function initAdb() {
     return adbManager!.discoverDevices();
   });
 
-  ipcMain.handle('app:checkUpdate', async () => {
-    const currentVersion = app.getVersion();
-    try {
-      const res = await fetch('https://pocket-server-palank.web.app/mbot-desktop-version.json', {
-        headers: { 'Cache-Control': 'no-cache' },
-      });
-      if (!res.ok) return null;
-      const data = await res.json() as { version: string; url: string; changelog: string };
-      if (data.version !== currentVersion) {
-        return { current: currentVersion, latest: data.version, url: data.url, changelog: data.changelog };
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  });
-
   ipcMain.handle('app:openExternal', async (_event, url: string) => {
     await shell.openExternal(url);
+  });
+
+  ipcMain.handle('app:installUpdate', () => {
+    autoUpdater.quitAndInstall();
+  });
+
+  ipcMain.handle('app:getVersion', () => {
+    return app.getVersion();
   });
 }
 
@@ -105,6 +97,28 @@ app.whenReady().then(async () => {
   // Phase 2: HTTP API 서버 시작
   const { token, port } = startApiServer({ adbManager: adbManager! });
   console.log(`[Main] API server on port ${port}, token: ${token}`);
+
+  // 자동 업데이트
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('update:available', info.version);
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('update:progress', Math.round(progress.percent));
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow?.webContents.send('update:downloaded', info.version);
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[AutoUpdate] Error:', err.message);
+  });
+
+  autoUpdater.checkForUpdates().catch(() => {});
 });
 
 app.on('window-all-closed', () => {

@@ -708,33 +708,39 @@
       }
     }
 
-    async function checkForUpdate() {
-      try {
-        const update = await window.mbot.checkUpdate();
-        if (update) {
-          document.getElementById('updateText').textContent = `새 버전 v${update.latest} 사용 가능 (현재: v${update.current})`;
-          document.getElementById('updateBanner').style.display = 'flex';
-          document.getElementById('updateBtn').onclick = () => window.mbot.openExternal(update.url);
-          document.getElementById('updateDismiss').onclick = () => {
-            document.getElementById('updateBanner').style.display = 'none';
-          };
-        }
-      } catch {}
-    }
+    // === Auto Update ===
+    const updateBanner = document.getElementById('updateBanner');
+    const updateText = document.getElementById('updateText');
+    const updateBtn = document.getElementById('updateBtn');
+    const updateDismiss = document.getElementById('updateDismiss');
+
+    window.mbot.onUpdateAvailable((version) => {
+      updateText.textContent = `새 버전 v${version} 다운로드 중...`;
+      updateBanner.style.display = 'flex';
+      updateBtn.style.display = 'none';
+      updateDismiss.onclick = () => { updateBanner.style.display = 'none'; };
+    });
+
+    window.mbot.onUpdateProgress((percent) => {
+      updateText.textContent = `업데이트 다운로드 중... ${percent}%`;
+    });
+
+    window.mbot.onUpdateDownloaded((version) => {
+      updateText.textContent = `v${version} 다운로드 완료`;
+      updateBtn.textContent = '재시작';
+      updateBtn.style.display = 'inline-block';
+      updateBtn.onclick = () => window.mbot.installUpdate();
+    });
 
     async function refreshAll() {
       await refreshDevices();
       await onScanDevices();
-      await checkForUpdate();
     }
 
     document.getElementById('refreshBtn').addEventListener('click', refreshAll);
     document.getElementById('scanBtn').addEventListener('click', onScanDevices);
 
     refreshAll();
-
-    // === Update Check (on startup) ===
-    checkForUpdate();
   </script>
 </body>
 </html>

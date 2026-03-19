@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('mbot', {
   stopMirror: (serial: string) => ipcRenderer.invoke('device:stopMirror', serial),
   discoverDevices: () => ipcRenderer.invoke('device:discover'),
   inputText: (serial: string, text: string) => ipcRenderer.invoke('device:inputText', serial, text),
-  checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
+  installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  onUpdateAvailable: (cb: (version: string) => void) => ipcRenderer.on('update:available', (_e: any, v: string) => cb(v)),
+  onUpdateProgress: (cb: (percent: number) => void) => ipcRenderer.on('update:progress', (_e: any, p: number) => cb(p)),
+  onUpdateDownloaded: (cb: (version: string) => void) => ipcRenderer.on('update:downloaded', (_e: any, v: string) => cb(v)),
 });

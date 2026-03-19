@@ -1,6 +1,6 @@
 {
   "name": "mbot-desktop",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "mbot Desktop — AI Agent Hub for Multi-Phone Control",
   "main": "dist/main/index.js",
   "type": "module",
@@ -56,6 +56,10 @@
       "category": "Utility"
     },
     "artifactName": "mbot-Desktop-Setup.${ext}",
+    "publish": {
+      "provider": "generic",
+      "url": "https://pub-832ccadf097e4bf687650db1e57df66b.r2.dev"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
@@ -93,6 +97,7 @@
     "@yume-chan/scrcpy-decoder-webcodecs": "^2.5.0",
     "@yume-chan/stream-extra": "^2.1.0",
     "cors": "^2.8.6",
+    "electron-updater": "^6.8.3",
     "express": "^5.2.1",
     "uuid": "^13.0.0"
   }

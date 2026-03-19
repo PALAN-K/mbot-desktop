@@ -43,8 +43,11 @@ jobs:
           name: release-${{ matrix.platform }}
           path: |
             release/*.exe
+            release/*.exe.blockmap
             release/*.dmg
+            release/*.dmg.blockmap
             release/*.AppImage
+            release/latest*.yml
           if-no-files-found: ignore
 
   release:
@@ -65,13 +68,9 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.R2_SECRET_KEY }}
           aws configure set default.region auto
 
-          for file in artifacts/mbot-Desktop-Setup.*; do
+          for file in artifacts/*; do
             [ -f "$file" ] || continue
             filename=$(basename "$file")
-            # blockmap 등 불필요 파일 제외
-            case "$filename" in
-              *.blockmap|*.yml|*.yaml) continue ;;
-            esac
             echo "Uploading $filename to R2..."
             aws s3 cp "$file" "s3://pocketserver-apk/$filename" \
               --endpoint-url "${{ secrets.R2_ENDPOINT }}" \
