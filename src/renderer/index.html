@@ -748,6 +748,14 @@
       updateBtn.onclick = () => window.mbot.installUpdate();
     });
 
+    window.mbot.onUpdateError((msg) => {
+      updateText.textContent = `업데이트 실패 — 재시작하면 자동 재시도됩니다`;
+      updateBtn.textContent = '닫기';
+      updateBtn.style.display = 'inline-block';
+      updateBtn.onclick = () => { updateBanner.style.display = 'none'; };
+      console.error('[Update Error]', msg);
+    });
+
     async function refreshAll() {
       await refreshDevices();
       await onScanDevices();

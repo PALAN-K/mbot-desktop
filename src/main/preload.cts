@@ -23,4 +23,5 @@ contextBridge.exposeInMainWorld('mbot', {
   onUpdateAvailable: (cb: (version: string) => void) => ipcRenderer.on('update:available', (_e: any, v: string) => cb(v)),
   onUpdateProgress: (cb: (percent: number) => void) => ipcRenderer.on('update:progress', (_e: any, p: number) => cb(p)),
   onUpdateDownloaded: (cb: (version: string) => void) => ipcRenderer.on('update:downloaded', (_e: any, v: string) => cb(v)),
+  onUpdateError: (cb: (msg: string) => void) => ipcRenderer.on('update:error', (_e: any, m: string) => cb(m)),
 });
