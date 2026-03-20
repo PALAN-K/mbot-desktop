@@ -35,7 +35,8 @@ async function createWindow() {
 }
 
 async function initAdb() {
-  adbManager = new AdbManager();
+  const storagePath = path.join(app.getPath('userData'), 'adb-store');
+  adbManager = new AdbManager(storagePath);
 
   ipcMain.handle('device:list', async () => {
     return adbManager!.listDevices();
@@ -61,8 +62,8 @@ async function initAdb() {
     return adbManager!.pairDevice(ip, port, code);
   });
 
-  ipcMain.handle('device:connect', async (_event, ip: string, port: number) => {
-    return adbManager!.connectDevice(ip, port);
+  ipcMain.handle('device:connect', async (_event, ip: string, port: number, mdnsName?: string) => {
+    return adbManager!.connectDevice(ip, port, mdnsName);
   });
 
   ipcMain.handle('device:mirror', async (_event, serial: string) => {
@@ -79,6 +80,22 @@ async function initAdb() {
 
   ipcMain.handle('device:removeMdnsCache', async (_event, name: string) => {
     adbManager!.removeMdnsCache(name);
+  });
+
+  ipcMain.handle('device:savedDevices', async () => {
+    return adbManager!.getSavedDevices();
+  });
+
+  ipcMain.handle('device:removeSaved', async (_event, key: string) => {
+    adbManager!.removeSavedDevice(key);
+  });
+
+  ipcMain.handle('device:forget', async (_event, serial: string) => {
+    return adbManager!.forgetDevice(serial);
+  });
+
+  ipcMain.handle('device:reconnect', async () => {
+    return adbManager!.reconnectSavedDevices();
   });
 
   ipcMain.handle('app:openExternal', async (_event, url: string) => {

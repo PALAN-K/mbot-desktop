@@ -595,6 +595,17 @@
       }
     }
 
+    // === Forget (ADB disconnect + 저장소에서 제거) ===
+    async function onForgetDevice(serial) {
+      try {
+        await window.mbot.forgetDevice(serial);
+        log(`${serial} 연결 해제 완료`, 'success');
+      } catch (e) {
+        log('연결 해제 실패', 'error');
+      }
+      refreshAll();
+    }
+
     // === Mirror + Stability combo ===
     async function onMirrorWithStability(serial) {
       await onStability(serial);
@@ -642,10 +653,11 @@
       btn.disabled = true;
       btn.textContent = '연결 중...';
       try {
-        const ok = await window.mbot.connectDevice(ip, port);
+        // mdnsName 전달 → 연결 성공 시 영속 저장됨
+        const ok = await window.mbot.connectDevice(ip, port, deviceName || undefined);
         if (ok) {
           btn.textContent = '연결됨!';
-          log(`${ip} 연결 완료`, 'success');
+          log(`${ip} 연결 완료 (저장됨)`, 'success');
           await refreshDevices();
           setTimeout(onScanDevices, 500);
         } else {
@@ -704,6 +716,7 @@
           <div class="device-actions">
             <button class="btn-primary" onclick="onMirrorWithStability('${device.serial}')">미러링</button>
             ${!isWireless ? `<button class="btn-secondary" onclick="onGoWireless('${device.serial}')">무선 전환</button>` : ''}
+            ${isWireless ? `<button class="btn-ghost" onclick="onForgetDevice('${device.serial}')">연결 해제</button>` : ''}
             <button class="btn-ghost" onclick="onRestore('${device.serial}')">설정 복원</button>
           </div>
         `;
@@ -740,10 +753,27 @@
       await onScanDevices();
     }
 
+    // 앱 시작 시 저장된 기기 자동 재연결
+    async function autoReconnect() {
+      try {
+        const result = await window.mbot.reconnectSavedDevices();
+        if (result.total === 0) return;
+        if (result.success.length > 0) {
+          log(`자동 재연결: ${result.success.join(', ')}`, 'success');
+        }
+        if (result.failed.length > 0) {
+          log(`재연결 실패 (USB 재연결 필요): ${result.failed.join(', ')}`, 'error');
+        }
+      } catch (e) {
+        console.error('Auto-reconnect error:', e);
+      }
+    }
+
     document.getElementById('refreshBtn').addEventListener('click', refreshAll);
     document.getElementById('scanBtn').addEventListener('click', onScanDevices);
 
-    refreshAll();
+    // 시작 순서: 재연결 → 목록 갱신 → 주변 검색
+    autoReconnect().then(() => refreshAll());
   </script>
 </body>
 </html>
