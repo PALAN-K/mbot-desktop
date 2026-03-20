@@ -153,8 +153,10 @@ export class AdbManager {
     try {
       console.log('[AdbManager] Listing devices...');
       const devices = await this.client.getDevices();
-      console.log('[AdbManager] Found devices:', devices.length);
-      return devices.map(d => ({
+      // mDNS 내부 식별자 중복 제거 (IP:port 연결과 동일 기기)
+      const filtered = devices.filter(d => !d.serial.includes('_adb-tls-connect'));
+      console.log('[AdbManager] Found devices:', filtered.length, `(filtered ${devices.length - filtered.length} duplicates)`);
+      return filtered.map(d => ({
         serial: d.serial,
         model: d.model ?? 'unknown',
         product: d.product ?? 'unknown',

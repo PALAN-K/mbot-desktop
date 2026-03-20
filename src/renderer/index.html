@@ -727,11 +727,14 @@
       form.className = 'pair-form';
       form.style.width = '100%';
       form.innerHTML = `
-        <p>폰 설정 → 개발자 옵션 → 무선 디버깅 → <b>"페어링 코드로 기기 페어링"</b>을 열고<br>
-        표시된 포트와 코드를 입력하세요.</p>
+        <p>
+          <b>최초 1회 페어링이 필요합니다.</b><br>
+          폰 <b>설정 → 개발자 옵션 → "무선 디버깅" 글자를 탭</b> → 상세 화면 진입<br>
+          → <b>"페어링 코드로 기기 페어링"</b> 탭 → 팝업에 표시된 값 입력
+        </p>
         <div class="pair-inputs">
-          <input class="pair-port" type="text" placeholder="포트" maxlength="5" inputmode="numeric">
-          <input class="pair-code" type="text" placeholder="코드 6자리" maxlength="6" inputmode="numeric">
+          <input class="pair-port" type="text" placeholder="포트 5자리" maxlength="5" inputmode="numeric" style="width:80px;">
+          <input class="pair-code" type="text" placeholder="코드 6자리" maxlength="6" inputmode="numeric" style="width:80px;">
           <button class="btn-primary" style="padding:6px 14px;font-size:12px;" id="pairBtn-${cardId}">페어링</button>
           <button class="btn-ghost" style="padding:6px 8px;font-size:11px;" id="pairCancel-${cardId}">취소</button>
         </div>
