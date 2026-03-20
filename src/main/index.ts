@@ -11,6 +11,8 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
 let adbManager: AdbManager | null = null;
+let apiToken = '';
+let apiPort = 8765;
 
 // EPIPE 크래시 방지
 process.stdout?.on('error', () => {});
@@ -98,6 +100,10 @@ async function initAdb() {
     return adbManager!.reconnectSavedDevices();
   });
 
+  ipcMain.handle('device:installExtension', async (_event, serial: string) => {
+    return adbManager!.installApiExtension(serial, apiToken, apiPort);
+  });
+
   ipcMain.handle('app:openExternal', async (_event, url: string) => {
     await shell.openExternal(url);
   });
@@ -117,8 +123,20 @@ app.whenReady().then(async () => {
   await createWindow();
 
   // Phase 2: HTTP API 서버 시작
-  const { token, port } = startApiServer({ adbManager: adbManager! });
-  console.log(`[Main] API server on port ${port}, token: ${token}`);
+  const serverResult = startApiServer({ adbManager: adbManager! });
+  apiToken = serverResult.token;
+  apiPort = serverResult.port;
+  console.log(`[Main] API server on port ${apiPort}, token: ${apiToken}`);
+
+  // Phase 3: 연결된 mbot 기기에 API extension 자동 설치
+  try {
+    const devices = await adbManager!.listDevices();
+    for (const device of devices) {
+      adbManager!.installApiExtension(device.serial, apiToken, apiPort).catch(() => {});
+    }
+  } catch (e) {
+    console.error('[Main] Auto-install extension failed:', e);
+  }
 
   // 자동 업데이트
   autoUpdater.autoDownload = true;

@@ -2,6 +2,7 @@ import { AdbServerClient } from '@yume-chan/adb';
 import { AdbServerNodeTcpConnector } from '@yume-chan/adb-server-node-tcp';
 import { execSync, spawn, ChildProcess } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { networkInterfaces } from 'os';
 import path from 'path';
 import { sanitizeSerial, sanitizeIP, sanitizePort, sanitizePairingCode } from '../utils/sanitize.js';
 
@@ -432,5 +433,62 @@ export class AdbManager {
       console.error(`[Forget] Disconnect failed: ${e.message}`);
     }
     this.removeSavedDevice(serial);
+  }
+
+  // ─── OpenClaw API Extension 자동 설치 ─────────────────
+
+  private getLocalIP(): string {
+    const nets = networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name] || []) {
+        if (net.family === 'IPv4' && !net.internal && (net.address.startsWith('192.168') || net.address.startsWith('10.'))) {
+          return net.address;
+        }
+      }
+    }
+    return '127.0.0.1';
+  }
+
+  /** 기기에 com.palank.mbot이 설치되어 있는지 확인 */
+  private hasMbot(serial: string): boolean {
+    try {
+      const s = sanitizeSerial(serial);
+      const out = execSync(`adb -s ${s} shell pm list packages com.palank.mbot`, { timeout: 5000 }).toString();
+      return out.includes('com.palank.mbot');
+    } catch {
+      return false;
+    }
+  }
+
+  /** 연결된 mbot 기기에 API 서버 URL + 토큰 주입 (DesktopConfigReceiver broadcast) */
+  async installApiExtension(serial: string, apiToken: string, apiPort: number = 8765): Promise<boolean> {
+    if (!this.hasMbot(serial)) {
+      console.log(`[Extension] ${serial}: mbot not installed, skipping`);
+      return false;
+    }
+
+    const ip = this.getLocalIP();
+    const baseUrl = `http://${ip}:${apiPort}`;
+    const s = sanitizeSerial(serial);
+
+    console.log(`[Extension] Injecting API config on ${serial} → ${baseUrl}`);
+
+    try {
+      const output = execSync(
+        `adb -s ${s} shell am broadcast ` +
+        `-a com.palank.mbot.action.DESKTOP_CONFIG ` +
+        `-n com.palank.mbot/.receiver.DesktopConfigReceiver ` +
+        `--es url "${baseUrl}" ` +
+        `--es token "${apiToken}"`,
+        { timeout: 10000 }
+      ).toString();
+
+      const ok = output.includes('Broadcast completed');
+      console.log(`[Extension] ${ok ? 'SUCCESS' : 'FAILED'}: ${output.trim()}`);
+      return ok;
+    } catch (e: any) {
+      console.error(`[Extension] Broadcast failed:`, e.message);
+      return false;
+    }
   }
 }
