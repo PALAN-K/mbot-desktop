@@ -190,6 +190,39 @@
       border: 1px dashed #374151;
     }
 
+    /* Pairing Form */
+    .pair-form {
+      margin-top: 10px;
+      padding: 12px;
+      background: #111827;
+      border-radius: 8px;
+      border: 1px solid #374151;
+    }
+    .pair-form p {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    .pair-inputs {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .pair-inputs input {
+      background: #1f2937;
+      border: 1px solid #4b5563;
+      border-radius: 6px;
+      color: #f9fafb;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: 'Cascadia Code', monospace;
+      outline: none;
+    }
+    .pair-inputs input:focus { border-color: #3b82f6; }
+    .pair-inputs input.pair-port { width: 70px; }
+    .pair-inputs input.pair-code { width: 90px; }
+
     /* Empty State */
     .empty-state {
       text-align: center;
@@ -633,14 +666,21 @@
         discoverGrid.innerHTML = '';
         for (const dev of newDevices) {
           const displayName = dev.name.replace('adb-', '').substring(0, 16);
+          const isTls = dev.service.includes('tls-connect');
+          const cardId = `card-${dev.name.replace(/[^a-zA-Z0-9]/g, '')}`;
           const card = document.createElement('div');
           card.className = 'discover-card';
+          card.style.flexWrap = 'wrap';
+          card.id = cardId;
           card.innerHTML = `
             <div class="discover-info">
               <h4>${displayName}</h4>
-              <p>${dev.ip}</p>
+              <p>${dev.ip}${isTls ? ' · Android 11+' : ''}</p>
             </div>
-            <button class="btn-primary" style="padding:6px 14px;font-size:12px;" onclick="onAutoConnect('${dev.ip}', ${dev.port}, '${dev.name}', this)">연결</button>
+            <button class="btn-primary" style="padding:6px 14px;font-size:12px;"
+              onclick="onAutoConnect('${dev.ip}', ${dev.port}, '${dev.name}', '${dev.service}', this, '${cardId}')">
+              연결
+            </button>
           `;
           discoverGrid.appendChild(card);
         }
@@ -649,21 +689,25 @@
       }
     }
 
-    async function onAutoConnect(ip, port, deviceName, btn) {
+    async function onAutoConnect(ip, port, deviceName, service, btn, cardId) {
       btn.disabled = true;
       btn.textContent = '연결 중...';
       try {
-        // mdnsName 전달 → 연결 성공 시 영속 저장됨
         const ok = await window.mbot.connectDevice(ip, port, deviceName || undefined);
         if (ok) {
           btn.textContent = '연결됨!';
           log(`${ip} 연결 완료 (저장됨)`, 'success');
           await refreshDevices();
           setTimeout(onScanDevices, 500);
+        } else if (service.includes('tls-connect')) {
+          // TLS 기기 연결 실패 → 페어링 필요
+          btn.textContent = '페어링 필요';
+          btn.disabled = false;
+          btn.onclick = () => showPairForm(ip, port, deviceName, cardId, btn);
+          showPairForm(ip, port, deviceName, cardId, btn);
         } else {
           btn.textContent = '실패';
           btn.disabled = false;
-          // 연결 실패 시 캐시에서 제거 (IP/포트 변경됐을 가능성)
           if (deviceName) await window.mbot.removeMdnsCache(deviceName);
           setTimeout(() => { btn.textContent = '연결'; }, 2000);
         }
@@ -672,6 +716,84 @@
         btn.disabled = false;
         if (deviceName) await window.mbot.removeMdnsCache(deviceName);
       }
+    }
+
+    function showPairForm(ip, connectPort, deviceName, cardId, originalBtn) {
+      const card = document.getElementById(cardId);
+      if (!card || card.querySelector('.pair-form')) return;
+      originalBtn.style.display = 'none';
+
+      const form = document.createElement('div');
+      form.className = 'pair-form';
+      form.style.width = '100%';
+      form.innerHTML = `
+        <p>폰 설정 → 개발자 옵션 → 무선 디버깅 → <b>"페어링 코드로 기기 페어링"</b>을 열고<br>
+        표시된 포트와 코드를 입력하세요.</p>
+        <div class="pair-inputs">
+          <input class="pair-port" type="text" placeholder="포트" maxlength="5" inputmode="numeric">
+          <input class="pair-code" type="text" placeholder="코드 6자리" maxlength="6" inputmode="numeric">
+          <button class="btn-primary" style="padding:6px 14px;font-size:12px;" id="pairBtn-${cardId}">페어링</button>
+          <button class="btn-ghost" style="padding:6px 8px;font-size:11px;" id="pairCancel-${cardId}">취소</button>
+        </div>
+      `;
+      card.appendChild(form);
+
+      const portInput = form.querySelector('.pair-port');
+      const codeInput = form.querySelector('.pair-code');
+      const pairBtn = form.querySelector('#pairBtn-' + cardId);
+      const cancelBtn = form.querySelector('#pairCancel-' + cardId);
+
+      cancelBtn.onclick = () => {
+        form.remove();
+        originalBtn.style.display = '';
+        originalBtn.textContent = '페어링';
+      };
+
+      pairBtn.onclick = async () => {
+        const pairPort = parseInt(portInput.value.trim());
+        const code = codeInput.value.trim();
+        if (!pairPort || !code || code.length < 6) {
+          log('포트와 6자리 코드를 모두 입력하세요', 'error');
+          return;
+        }
+
+        pairBtn.disabled = true;
+        pairBtn.textContent = '페어링 중...';
+        log(`페어링 시도: ${ip}:${pairPort}`);
+
+        try {
+          const paired = await window.mbot.pairDevice(ip, pairPort, code);
+          if (paired) {
+            log(`페어링 성공! 연결 중...`, 'success');
+            pairBtn.textContent = '연결 중...';
+
+            // 페어링 성공 후 connect (connect 포트 사용)
+            const connected = await window.mbot.connectDevice(ip, connectPort, deviceName);
+            if (connected) {
+              log(`${ip} 연결 완료 (저장됨)`, 'success');
+              await refreshDevices();
+              setTimeout(onScanDevices, 500);
+            } else {
+              // connect 포트가 변경됐을 수 있음 → mDNS 재탐색
+              log('페어링 완료. 검색 후 다시 연결하세요.', 'entry');
+              setTimeout(onScanDevices, 1000);
+            }
+          } else {
+            pairBtn.disabled = false;
+            pairBtn.textContent = '페어링';
+            log('페어링 실패 — 코드를 다시 확인하세요', 'error');
+          }
+        } catch (e) {
+          pairBtn.disabled = false;
+          pairBtn.textContent = '페어링';
+          log('페어링 오류', 'error');
+        }
+      };
+
+      // 포트 입력 후 Tab → 코드로 이동, 코드 입력 후 Enter → 페어링
+      portInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') codeInput.focus(); });
+      codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') pairBtn.click(); });
+      portInput.focus();
     }
 
     // === Device List ===
