@@ -68,10 +68,11 @@ export function createInputRoutes(_adb: AdbManager) {
         adbShell(serial, `input text '${clean}'`);
         res.json({ status: 'ok', action: 'type', method: 'input_text', text });
       } else {
-        // 한글 포함: ADB broadcast 방식 (ADBKeyboard 또는 커스텀 IME)
-        const base64 = Buffer.from(text, 'utf-8').toString('base64');
-        adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
-        res.json({ status: 'ok', action: 'type', method: 'broadcast_b64', text });
+        // 한글/이모지: ClipboardReceiver로 클립보드 설정 → 붙여넣기
+        const escaped = text.replace(/'/g, "'\\''");
+        adbShell(serial, `am broadcast -a com.palank.mbot.action.CLIPBOARD_SET -n com.palank.mbot/.receiver.ClipboardReceiver --es text '${escaped}'`);
+        adbShell(serial, `input keyevent 279`);
+        res.json({ status: 'ok', action: 'type', method: 'clipboard_paste', text });
       }
     } catch (error: any) {
       res.status(500).json({ error: error.message });

@@ -95,15 +95,16 @@ export function createActionsRoutes(_adb: AdbManager) {
       adbShell(serial, 'input keyevent --longpress KEYCODE_DEL');
       sleep(200);
 
-      // 5. 메시지 입력 (한글 지원: broadcast_b64 우선)
+      // 5. 메시지 입력 (한글 지원: ClipboardReceiver + KEYCODE_PASTE)
       stage.current = 'type_message';
       const isAsciiOnly = /^[\x20-\x7E]*$/.test(message);
       if (isAsciiOnly) {
         const clean = message.replace(/'/g, "'\\''").replace(/ /g, '%s');
         adbShell(serial, `input text '${clean}'`);
       } else {
-        const base64 = Buffer.from(message, 'utf-8').toString('base64');
-        adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
+        const escaped = message.replace(/'/g, "'\\''");
+        adbShell(serial, `am broadcast -a com.palank.mbot.action.CLIPBOARD_SET -n com.palank.mbot/.receiver.ClipboardReceiver --es text '${escaped}'`);
+        adbShell(serial, `input keyevent 279`);
       }
       sleep(500);
 
@@ -245,8 +246,9 @@ export function createActionsRoutes(_adb: AdbManager) {
       tap(serial, center.x, center.y);
       sleep(300);
 
-      // base64 인코딩으로 쉘 메타문자 우회
-      const base64 = Buffer.from(message, 'utf-8').toString('base64');
+      // ClipboardReceiver로 클립보드 설정 → 붙여넣기
+      const escaped = message.replace(/'/g, "'\\''");
+      adbShell(serial, `am broadcast -a com.palank.mbot.action.CLIPBOARD_SET -n com.palank.mbot/.receiver.ClipboardReceiver --es text '${escaped}'`);
       adbShell(serial, `input keyevent 279`); // PASTE
 
       sleep(500);
@@ -386,8 +388,15 @@ export function createActionsRoutes(_adb: AdbManager) {
         }
         case 'type': {
           if (!step.text) break;
-          const base64 = Buffer.from(step.text, 'utf-8').toString('base64');
-          adbShell(serial, `am broadcast -a ADB_INPUT_B64 --es msg '${base64}'`);
+          const isAscii = /^[\x20-\x7E]*$/.test(step.text);
+          if (isAscii) {
+            const clean = step.text.replace(/'/g, "'\\''").replace(/ /g, '%s');
+            adbShell(serial, `input text '${clean}'`);
+          } else {
+            const esc = step.text.replace(/'/g, "'\\''");
+            adbShell(serial, `am broadcast -a com.palank.mbot.action.CLIPBOARD_SET -n com.palank.mbot/.receiver.ClipboardReceiver --es text '${esc}'`);
+            adbShell(serial, `input keyevent 279`);
+          }
           log.push({ step: i, action: 'type', result: step.text.substring(0, 30) });
           break;
         }
