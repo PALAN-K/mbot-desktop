@@ -192,11 +192,12 @@ app.whenReady().then(async () => {
     console.error('[Main] Auto-install extension failed:', e);
   }
 
-  // 자동 업데이트
+  // 자동 업데이트 — renderer 로드 완료 후 체크
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('update-available', (info) => {
+    console.log('[AutoUpdate] Update available:', info.version);
     mainWindow?.webContents.send('update:available', info.version);
   });
 
@@ -205,7 +206,12 @@ app.whenReady().then(async () => {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
+    console.log('[AutoUpdate] Downloaded:', info.version);
     mainWindow?.webContents.send('update:downloaded', info.version);
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('[AutoUpdate] No update available (current:', app.getVersion(), ')');
   });
 
   autoUpdater.on('error', (err) => {
@@ -213,7 +219,12 @@ app.whenReady().then(async () => {
     mainWindow?.webContents.send('update:error', err.message);
   });
 
-  autoUpdater.checkForUpdates().catch(() => {});
+  // renderer가 로드된 후 체크 (너무 빨리 체크하면 이벤트가 renderer에 도달 못함)
+  mainWindow?.webContents.on('did-finish-load', () => {
+    autoUpdater.checkForUpdates().catch((e) => {
+      console.error('[AutoUpdate] Check failed:', e.message);
+    });
+  });
 });
 
 app.on('window-all-closed', () => {
