@@ -47,12 +47,14 @@ function getLocalIPs(): string[] {
  * 파일명이 어댑터 ID가 됨 (kakao.js → /api/kakao/*).
  * userData/adapters/{id}/config.json이 있으면 remote config로 전달.
  */
-function loadBuiltinAdapters(expressApp: ReturnType<typeof express>, adbManager: AdbManager): void {
+function loadBuiltinAdapters(expressApp: ReturnType<typeof express>, adbManager: AdbManager): Set<string> {
+  const builtinIds = new Set<string>();
+
   // dist 기준 경로 (tsc 빌드 후)
   const adaptersDir = path.join(__dirname, 'api', 'routes', 'adapters');
   if (!existsSync(adaptersDir)) {
     console.log('[BuiltinAdapters] No adapters directory found at', adaptersDir);
-    return;
+    return builtinIds;
   }
 
   const files = readdirSync(adaptersDir).filter(f => f.endsWith('.js'));
@@ -84,11 +86,14 @@ function loadBuiltinAdapters(expressApp: ReturnType<typeof express>, adbManager:
 
       const router = factory(adbManager, remoteConfig);
       expressApp.use(`/api/${adapterId}`, router);
+      builtinIds.add(adapterId);
       console.log(`[BuiltinAdapters] Loaded: ${adapterId} → /api/${adapterId}/*${remoteConfig ? ' (with remote config)' : ''}`);
     } catch (e: any) {
       console.error(`[BuiltinAdapters] Failed to load ${file}:`, e.message);
     }
   }
+
+  return builtinIds;
 }
 
 export function startApiServer(options: ApiServerOptions) {
@@ -307,13 +312,13 @@ export function startApiServer(options: ApiServerOptions) {
   // 인증 미들웨어
   expressApp.use('/api', createAuthMiddleware(token));
 
-  // 설치된 어댑터 로드 (handler.js가 Express에 직접 라우트 등록)
-  adapterManager.loadAll();
+  // 1. 빌트인 어댑터 먼저 등록 (adapters/*.js 자동 스캔)
+  //    빌트인이 우선, handler.js는 빌트인이 없는 어댑터만 로드
+  const builtinIds = loadBuiltinAdapters(expressApp, adbManager);
 
-  // 빌트인 어댑터 자동 스캔: dist/main/api/routes/adapters/*.js
-  // 각 파일은 createXxxRoutes(adb, remoteConfig?) 함수를 default 또는 named export
-  // 파일명 = 어댑터 ID (예: kakao.js → /api/kakao/*)
-  loadBuiltinAdapters(expressApp, adbManager);
+  // 2. 설치된 어댑터 로드 (handler.js — 빌트인과 겹치면 handler.js 로드 스킵)
+  //    단, 사이드바 표시를 위해 manifest는 loaded 맵에 등록
+  adapterManager.loadAll(builtinIds);
 
   // 라우트 등록
   expressApp.use('/api', createScreenRoutes(adbManager));

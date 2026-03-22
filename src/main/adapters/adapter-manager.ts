@@ -250,9 +250,20 @@ export class AdapterManager {
     });
   }
 
-  /** 설치된 모든 어댑터 로드 */
-  loadAll(): void {
+  /** 설치된 모든 어댑터 로드 (빌트인 ID가 있으면 handler.js 로드 건너뛰고 manifest만 등록) */
+  loadAll(builtinIds?: Set<string>): void {
     for (const id of this.getInstalledIds()) {
+      if (builtinIds?.has(id)) {
+        // 빌트인 어댑터: handler.js 로드 안 함, manifest만 등록 (사이드바 표시용)
+        if (!this.loaded.has(id)) {
+          const manifest = this.getManifest(id);
+          if (manifest) {
+            this.loaded.set(id, { manifest, status: 'running' });
+            console.log(`[AdapterManager] Registered (builtin): ${manifest.name} (${id}) v${manifest.version}`);
+          }
+        }
+        continue;
+      }
       this.load(id);
     }
   }
