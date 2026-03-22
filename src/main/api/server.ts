@@ -11,6 +11,7 @@ import { createInputRoutes } from './routes/input.js';
 import { createDeviceRoutes } from './routes/device.js';
 import { createActionsRoutes } from './routes/actions.js';
 import { createPcRoutes } from './routes/pc.js';
+import { createKakaoRoutes } from './routes/adapters/kakao.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { createRateLimit } from './middleware/rateLimit.js';
 
@@ -176,6 +177,28 @@ export function startApiServer(options: ApiServerOptions) {
           desc: 'Launch app. e.g. com.kakao.talk, com.naver.app',
         },
       ],
+      kakao_apis: [
+        {
+          method: 'POST', path: '/api/kakao/open-room',
+          body: { serial: 'string', roomName: 'string' },
+          desc: 'Open a KakaoTalk chat room by name. Searches and enters the room.',
+        },
+        {
+          method: 'POST', path: '/api/kakao/read-thread',
+          body: { serial: 'string', scrollCount: 3, maxMessages: 100 },
+          desc: 'Read chat messages from current room with scroll collection. Returns sender, text, time.',
+        },
+        {
+          method: 'POST', path: '/api/kakao/send-message',
+          body: { serial: 'string', roomName: 'string', message: 'string' },
+          desc: 'Open room + type message + send + verify. Atomic operation with Korean support.',
+        },
+        {
+          method: 'GET', path: '/api/kakao/rooms',
+          params: 'serial (query), scrollCount? (query)',
+          desc: 'List recent chat rooms with name, last message, time, unread count.',
+        },
+      ],
       pc_apis: [
         {
           method: 'GET', path: '/api/pc/screenshot/file',
@@ -247,6 +270,7 @@ export function startApiServer(options: ApiServerOptions) {
   expressApp.use('/api', createInputRoutes(adbManager));
   expressApp.use('/api', createDeviceRoutes(adbManager));
   expressApp.use('/api', createActionsRoutes(adbManager));
+  expressApp.use('/api/kakao', createKakaoRoutes(adbManager));
   const pcRoutes = createPcRoutes();
   expressApp.use('/api', pcRoutes);
   // 별칭: OpenClaw가 /api/file 등으로 호출할 수 있으므로 /pc/ 없이도 동작

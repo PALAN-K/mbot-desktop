@@ -1,40 +1,14 @@
 import { Router } from 'express';
-import { execSync } from 'child_process';
 import type { AdbManager } from '../../adb/AdbManager.js';
-import { parseUiDump, findByText, getCenterPoint } from '../../utils/uiParser.js';
-import { sanitizeSerial, sanitizeCoord, sanitizePhoneNumber } from '../../utils/sanitize.js';
+import { findByText, getCenterPoint } from '../../utils/uiParser.js';
+import { sanitizeCoord, sanitizePhoneNumber } from '../../utils/sanitize.js';
+import { adbShell, getScreen, tap, sleep, typeText } from './helpers/appHelper.js';
 
 export function createActionsRoutes(_adb: AdbManager) {
   const router = Router();
 
-  function adbShell(serial: string, cmd: string): string {
-    const s = sanitizeSerial(serial);
-    return execSync(`adb -s ${s} shell ${cmd}`, { timeout: 5000 }).toString().trim();
-  }
-
-  function getScreen(serial: string) {
-    const s = sanitizeSerial(serial);
-    const xml = execSync(
-      `adb -s ${s} exec-out uiautomator dump /dev/tty`,
-      { timeout: 10000 }
-    ).toString();
-    return parseUiDump(xml);
-  }
-
-  function tap(serial: string, x: number, y: number) {
-    adbShell(serial, `input tap ${sanitizeCoord(x)} ${sanitizeCoord(y)}`);
-  }
-
-  function sleep(ms: number) {
-    const clamped = Math.min(Math.max(ms, 100), 5000);
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, clamped);
-  }
-
   /**
    * POST /api/sms/send — SMS 전송 (원자적: 실행 + 입력 + 전송 + 검증)
-   *
-   * body: { serial, number, message, verify?: true, timeoutMs?: 8000 }
-   * 응답: { status: "sent"|"failed", stage, number, message, verified, method }
    */
   router.post('/sms/send', async (req, res) => {
     const { serial, number, message, verify = true, timeoutMs = 8000 } = req.body;
@@ -52,27 +26,24 @@ export function createActionsRoutes(_adb: AdbManager) {
     try {
       const cleanNumber = sanitizePhoneNumber(number);
 
-      // 1. SMS 앱 실행 (Samsung 기본 메시지 앱 우선, fallback으로 범용 intent)
       stage.current = 'launch_sms_app';
       try {
-        adbShell(serial, `am start -a android.intent.action.SENDTO -d sms:${cleanNumber}`);
+        adbShell(serial, ['am', 'start', '-a', 'android.intent.action.SENDTO', '-d', `sms:${cleanNumber}`]);
       } catch {
-        adbShell(serial, `monkey -p com.samsung.android.messaging -c android.intent.category.LAUNCHER 1`);
+        adbShell(serial, ['monkey', '-p', 'com.samsung.android.messaging', '-c', 'android.intent.category.LAUNCHER', '1']);
       }
       sleep(1200);
 
-      // 2. 첨부 패널이 열려있으면 닫기 (뒤로가기)
       stage.current = 'dismiss_panels';
       const preCheck = getScreen(serial);
       const hasAttachPanel = preCheck.some(e =>
         e.text === '카메라' || e.text === '갤러리' || e.text === '음성'
       );
       if (hasAttachPanel) {
-        adbShell(serial, 'input keyevent KEYCODE_BACK');
+        adbShell(serial, ['input', 'keyevent', 'KEYCODE_BACK']);
         sleep(500);
       }
 
-      // 3. 입력 필드 찾기 + 포커스
       stage.current = 'focus_input';
       const elements = getScreen(serial);
       const inputField = elements.find(e =>
@@ -85,30 +56,18 @@ export function createActionsRoutes(_adb: AdbManager) {
         const center = getCenterPoint(inputField.bounds);
         tap(serial, center.x, center.y);
       } else {
-        // EditText 못 찾으면 하단 입력창 영역 직접 탭 (fallback)
         tap(serial, 540, 2080);
       }
       sleep(300);
 
-      // 4. 기존 입력값 제거
-      adbShell(serial, 'input keyevent KEYCODE_MOVE_END');
-      adbShell(serial, 'input keyevent --longpress KEYCODE_DEL');
+      adbShell(serial, ['input', 'keyevent', 'KEYCODE_MOVE_END']);
+      adbShell(serial, ['input', 'keyevent', '--longpress', 'KEYCODE_DEL']);
       sleep(200);
 
-      // 5. 메시지 입력 (한글 지원: ClipboardReceiver + KEYCODE_PASTE)
       stage.current = 'type_message';
-      const isAsciiOnly = /^[\x20-\x7E]*$/.test(message);
-      if (isAsciiOnly) {
-        const clean = message.replace(/'/g, "'\\''").replace(/ /g, '%s');
-        adbShell(serial, `input text '${clean}'`);
-      } else {
-        const escaped = message.replace(/'/g, "'\\''");
-        adbShell(serial, `am broadcast -a com.palank.mbot.action.CLIPBOARD_SET -n com.palank.mbot/.receiver.ClipboardReceiver --es text '${escaped}'`);
-        adbShell(serial, `input keyevent 279`);
-      }
+      typeText(serial, message);
       sleep(500);
 
-      // 6. 전송 버튼 탐지 + 탭
       stage.current = 'send_tap';
       const elements2 = getScreen(serial);
       const sendBtn = elements2.find(e =>
@@ -121,19 +80,14 @@ export function createActionsRoutes(_adb: AdbManager) {
         const sendCenter = getCenterPoint(sendBtn.bounds);
         tap(serial, sendCenter.x, sendCenter.y);
       } else {
-        // 전송 버튼 못 찾으면 우측 하단 전송 아이콘 좌표 fallback → 그래도 안 되면 Enter
         tap(serial, 1015, 2080);
         sleep(200);
-        adbShell(serial, 'input keyevent 66');
+        adbShell(serial, ['input', 'keyevent', '66']);
       }
       sleep(500);
 
-      // 7. 검증
       if (!verify) {
-        res.json({
-          status: 'sent', number: cleanNumber, message,
-          verified: false, method: 'ui-compose-noverify',
-        });
+        res.json({ status: 'sent', number: cleanNumber, message, verified: false, method: 'ui-compose-noverify' });
         return;
       }
 
@@ -146,55 +100,33 @@ export function createActionsRoutes(_adb: AdbManager) {
         sleep(500);
         const elements3 = getScreen(serial);
         const texts = elements3.filter(e => e.text).map(e => e.text);
-        if (texts.some(t => t.includes(snippet))) {
-          verified = true;
-          break;
-        }
+        if (texts.some(t => t.includes(snippet))) { verified = true; break; }
       }
 
       if (verified) {
-        res.json({
-          status: 'sent', number: cleanNumber, message,
-          verified: true, method: 'ui-compose+verify',
-        });
+        res.json({ status: 'sent', number: cleanNumber, message, verified: true, method: 'ui-compose+verify' });
       } else {
-        // 1회 재시도: 전송 버튼 다시 탭
         stage.current = 'retry_send';
-        adbShell(serial, 'input keyevent 66');
+        adbShell(serial, ['input', 'keyevent', '66']);
         sleep(1000);
-
         const elements4 = getScreen(serial);
         const texts2 = elements4.filter(e => e.text).map(e => e.text);
         const retryVerified = texts2.some(t => t.includes(snippet));
-
         if (retryVerified) {
-          res.json({
-            status: 'sent', number: cleanNumber, message,
-            verified: true, method: 'ui-compose+verify+retry',
-          });
+          res.json({ status: 'sent', number: cleanNumber, message, verified: true, method: 'ui-compose+verify+retry' });
         } else {
-          res.status(409).json({
-            status: 'failed', stage: 'verify',
-            error: 'Message not observed on screen within timeout',
-            number: cleanNumber, message, verified: false,
-          });
+          res.status(409).json({ status: 'failed', stage: 'verify', error: 'Message not observed on screen within timeout', number: cleanNumber, message, verified: false });
         }
       }
     } catch (error: any) {
-      res.status(500).json({
-        status: 'failed', stage: stage.current,
-        error: error.message, verified: false,
-      });
+      res.status(500).json({ status: 'failed', stage: stage.current, error: error.message, verified: false });
     }
   });
 
   /** POST /api/kakao/read */
   router.post('/kakao/read', async (req, res) => {
     const { serial, scrollCount = 0 } = req.body;
-    if (!serial) {
-      res.status(400).json({ error: 'serial required' });
-      return;
-    }
+    if (!serial) { res.status(400).json({ error: 'serial required' }); return; }
 
     try {
       const sc = Math.min(Math.max(Math.floor(scrollCount), 0), 20);
@@ -206,7 +138,7 @@ export function createActionsRoutes(_adb: AdbManager) {
         allTexts.push(...texts);
 
         if (i < sc) {
-          adbShell(serial, 'input swipe 540 1500 540 500 300');
+          adbShell(serial, ['input', 'swipe', '540', '1500', '540', '500', '300']);
           sleep(1000);
         }
       }
@@ -221,51 +153,33 @@ export function createActionsRoutes(_adb: AdbManager) {
   /** POST /api/kakao/send */
   router.post('/kakao/send', async (req, res) => {
     const { serial, message } = req.body;
-    if (!serial || !message) {
-      res.status(400).json({ error: 'serial, message required' });
-      return;
-    }
-    if (typeof message !== 'string' || message.length > 2000) {
-      res.status(400).json({ error: 'message must be string, max 2000 chars' });
-      return;
-    }
+    if (!serial || !message) { res.status(400).json({ error: 'serial, message required' }); return; }
+    if (typeof message !== 'string' || message.length > 2000) { res.status(400).json({ error: 'message must be string, max 2000 chars' }); return; }
 
     try {
       const elements = getScreen(serial);
       const inputField = elements.find(e =>
-        e.resourceId.includes('message_edit_text') ||
-        e.className.includes('EditText')
+        e.resourceId.includes('message_edit_text') || e.className.includes('EditText')
       );
-
-      if (!inputField) {
-        res.status(400).json({ error: 'Chat input field not found' });
-        return;
-      }
+      if (!inputField) { res.status(400).json({ error: 'Chat input field not found' }); return; }
 
       const center = getCenterPoint(inputField.bounds);
       tap(serial, center.x, center.y);
       sleep(300);
 
-      // ClipboardReceiver로 클립보드 설정 → 붙여넣기
-      const escaped = message.replace(/'/g, "'\\''");
-      adbShell(serial, `am broadcast -a com.palank.mbot.action.CLIPBOARD_SET -n com.palank.mbot/.receiver.ClipboardReceiver --es text '${escaped}'`);
-      adbShell(serial, `input keyevent 279`); // PASTE
-
+      typeText(serial, message);
       sleep(500);
 
       const elements2 = getScreen(serial);
       const sendBtn = elements2.find(e =>
-        e.resourceId.includes('send') ||
-        e.contentDesc.includes('전송') ||
-        e.text === '전송'
+        e.resourceId.includes('send') || e.contentDesc.includes('전송') || e.text === '전송'
       );
-
       if (sendBtn) {
         const sendCenter = getCenterPoint(sendBtn.bounds);
         tap(serial, sendCenter.x, sendCenter.y);
         res.json({ status: 'sent', message });
       } else {
-        adbShell(serial, 'input keyevent 66');
+        adbShell(serial, ['input', 'keyevent', '66']);
         res.json({ status: 'sent_via_enter', message });
       }
     } catch (error: any) {
@@ -276,14 +190,10 @@ export function createActionsRoutes(_adb: AdbManager) {
   /** POST /api/call */
   router.post('/call', async (req, res) => {
     const { serial, number } = req.body;
-    if (!serial || !number) {
-      res.status(400).json({ error: 'serial, number required' });
-      return;
-    }
-
+    if (!serial || !number) { res.status(400).json({ error: 'serial, number required' }); return; }
     try {
       const clean = sanitizePhoneNumber(number);
-      adbShell(serial, `am start -a android.intent.action.CALL -d tel:${clean}`);
+      adbShell(serial, ['am', 'start', '-a', 'android.intent.action.CALL', '-d', `tel:${clean}`]);
       res.json({ status: 'calling', number: clean });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -293,36 +203,17 @@ export function createActionsRoutes(_adb: AdbManager) {
   /** POST /api/find */
   router.post('/find', async (req, res) => {
     const { serial, text, tap: shouldTap = false } = req.body;
-    if (!serial || !text) {
-      res.status(400).json({ error: 'serial, text required' });
-      return;
-    }
-    if (typeof text !== 'string' || text.length > 200) {
-      res.status(400).json({ error: 'text must be string, max 200 chars' });
-      return;
-    }
+    if (!serial || !text) { res.status(400).json({ error: 'serial, text required' }); return; }
+    if (typeof text !== 'string' || text.length > 200) { res.status(400).json({ error: 'text must be string, max 200 chars' }); return; }
 
     try {
       const elements = getScreen(serial);
       const found = findByText(elements, text);
-
-      if (!found) {
-        res.json({ found: false, text });
-        return;
-      }
+      if (!found) { res.json({ found: false, text }); return; }
 
       const center = getCenterPoint(found.bounds);
-      if (shouldTap) {
-        tap(serial, center.x, center.y);
-      }
-
-      res.json({
-        found: true,
-        text: found.text,
-        bounds: found.bounds,
-        center,
-        tapped: shouldTap,
-      });
+      if (shouldTap) { tap(serial, center.x, center.y); }
+      res.json({ found: true, text: found.text, bounds: found.bounds, center, tapped: shouldTap });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -330,24 +221,7 @@ export function createActionsRoutes(_adb: AdbManager) {
 
   /**
    * POST /api/do — 범용 액션 시퀀스 실행 + 검증
-   *
-   * 여러 단계를 원자적으로 실행하고 결과를 검증합니다.
-   * 앱별 API 없이 어떤 앱이든 제어 가능.
-   *
-   * body: {
-   *   serial: string,
-   *   steps: [
-   *     { action: "find", text: "내폰모음", tap: true },
-   *     { action: "sleep", ms: 500 },
-   *     { action: "find", text: "EditText", tap: true, by: "class" },
-   *     { action: "type", text: "안녕하세요" },
-   *     { action: "find", text: "전송", tap: true },
-   *   ],
-   *   verify?: { text: "안녕하세요", timeout?: 3000 },
-   *   retry?: { count?: 3, delayMs?: 1000 }
-   * }
    */
-  // steps 실행 함수 (재시도에서 재사용)
   function runSteps(serial: string, steps: any[]) {
     const log: { step: number; action: string; result: string }[] = [];
 
@@ -358,15 +232,10 @@ export function createActionsRoutes(_adb: AdbManager) {
         case 'find': {
           const elements = getScreen(serial);
           let found;
-          if (step.by === 'class') {
-            found = elements.find(e => e.className.includes(step.text));
-          } else if (step.by === 'id') {
-            found = elements.find(e => e.resourceId.includes(step.text));
-          } else if (step.by === 'desc') {
-            found = elements.find(e => e.contentDesc.includes(step.text));
-          } else {
-            found = findByText(elements, step.text);
-          }
+          if (step.by === 'class') found = elements.find(e => e.className.includes(step.text));
+          else if (step.by === 'id') found = elements.find(e => e.resourceId.includes(step.text));
+          else if (step.by === 'desc') found = elements.find(e => e.contentDesc.includes(step.text));
+          else found = findByText(elements, step.text);
           if (!found) {
             log.push({ step: i, action: 'find', result: `not found: ${step.text}` });
             if (step.optional) continue;
@@ -388,39 +257,31 @@ export function createActionsRoutes(_adb: AdbManager) {
         }
         case 'type': {
           if (!step.text) break;
-          const isAscii = /^[\x20-\x7E]*$/.test(step.text);
-          if (isAscii) {
-            const clean = step.text.replace(/'/g, "'\\''").replace(/ /g, '%s');
-            adbShell(serial, `input text '${clean}'`);
-          } else {
-            const esc = step.text.replace(/'/g, "'\\''");
-            adbShell(serial, `am broadcast -a com.palank.mbot.action.CLIPBOARD_SET -n com.palank.mbot/.receiver.ClipboardReceiver --es text '${esc}'`);
-            adbShell(serial, `input keyevent 279`);
-          }
+          typeText(serial, step.text);
           log.push({ step: i, action: 'type', result: step.text.substring(0, 30) });
           break;
         }
         case 'keyevent': {
-          adbShell(serial, `input keyevent ${step.keycode || 66}`);
+          adbShell(serial, ['input', 'keyevent', String(step.keycode || 66)]);
           log.push({ step: i, action: 'keyevent', result: `${step.keycode || 66}` });
           break;
         }
         case 'swipe': {
           const x1 = step.x1 || 540, y1 = step.y1 || 1500;
           const x2 = step.x2 || 540, y2 = step.y2 || 500;
-          adbShell(serial, `input swipe ${x1} ${y1} ${x2} ${y2} ${step.duration || 300}`);
+          adbShell(serial, ['input', 'swipe', String(x1), String(y1), String(x2), String(y2), String(step.duration || 300)]);
           log.push({ step: i, action: 'swipe', result: 'ok' });
           break;
         }
         case 'launch': {
           if (step.package) {
-            adbShell(serial, `monkey -p ${step.package} -c android.intent.category.LAUNCHER 1`);
+            adbShell(serial, ['monkey', '-p', step.package, '-c', 'android.intent.category.LAUNCHER', '1']);
             log.push({ step: i, action: 'launch', result: step.package });
           }
           break;
         }
         case 'back': {
-          adbShell(serial, 'input keyevent KEYCODE_BACK');
+          adbShell(serial, ['input', 'keyevent', 'KEYCODE_BACK']);
           log.push({ step: i, action: 'back', result: 'ok' });
           break;
         }
@@ -437,7 +298,6 @@ export function createActionsRoutes(_adb: AdbManager) {
     return { ok: true, log };
   }
 
-  // 화면 텍스트에서 verify.text 존재 확인
   function verifyScreen(serial: string, text: string, timeout: number): boolean {
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {
@@ -455,10 +315,7 @@ export function createActionsRoutes(_adb: AdbManager) {
       res.status(400).json({ error: 'serial, steps[] required' });
       return;
     }
-    if (steps.length > 20) {
-      res.status(400).json({ error: 'max 20 steps' });
-      return;
-    }
+    if (steps.length > 20) { res.status(400).json({ error: 'max 20 steps' }); return; }
 
     const maxRetries = Math.min(retry?.count || 1, 5);
     const retryDelay = Math.min(retry?.delayMs || 1000, 5000);
@@ -470,38 +327,23 @@ export function createActionsRoutes(_adb: AdbManager) {
         allLogs.push({ attempt, ...result });
 
         if (!result.ok) {
-          // steps 실행 자체가 실패
-          if (attempt < maxRetries) {
-            sleep(retryDelay);
-            continue;
-          }
+          if (attempt < maxRetries) { sleep(retryDelay); continue; }
           res.json({ success: false, attempts: attempt, reason: result.reason, logs: allLogs });
           return;
         }
 
-        // 검증
         if (verify?.text) {
           const timeout = Math.min(verify.timeout || 3000, 10000);
           const verified = verifyScreen(serial, verify.text, timeout);
-
           if (verified) {
             res.json({ success: true, verified: true, attempts: attempt, verifyText: verify.text, logs: allLogs });
             return;
           }
-
-          // 검증 실패 → 재시도
-          if (attempt < maxRetries) {
-            allLogs[allLogs.length - 1].verifyFailed = true;
-            sleep(retryDelay);
-            continue;
-          }
-
-          // 최종 실패
+          if (attempt < maxRetries) { allLogs[allLogs.length - 1].verifyFailed = true; sleep(retryDelay); continue; }
           res.json({ success: false, verified: false, attempts: attempt, verifyText: verify.text, logs: allLogs });
           return;
         }
 
-        // verify 없으면 성공으로 간주
         const elements = getScreen(serial);
         const texts = elements.filter(e => e.text).map(e => e.text);
         res.json({ success: true, attempts: attempt, screen: texts, logs: allLogs });

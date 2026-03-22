@@ -1,15 +1,10 @@
 import { Router } from 'express';
-import { execSync } from 'child_process';
 import type { AdbManager } from '../../adb/AdbManager.js';
-import { sanitizeSerial, sanitizeCoord, sanitizeShellArg, sanitizeKeycode, sanitizePackage } from '../../utils/sanitize.js';
+import { sanitizeCoord, sanitizeKeycode, sanitizePackage, sanitizeShellArg } from '../../utils/sanitize.js';
+import { adbShell, typeText } from './helpers/appHelper.js';
 
 export function createInputRoutes(_adb: AdbManager) {
   const router = Router();
-
-  function adbShell(serial: string, cmd: string): string {
-    const s = sanitizeSerial(serial);
-    return execSync(`adb -s ${s} shell ${cmd}`, { timeout: 5000 }).toString().trim();
-  }
 
   /** POST /api/tap */
   router.post('/tap', (req, res) => {
@@ -18,11 +13,10 @@ export function createInputRoutes(_adb: AdbManager) {
       res.status(400).json({ error: 'serial, x, y required' });
       return;
     }
-
     try {
       const sx = sanitizeCoord(x);
       const sy = sanitizeCoord(y);
-      adbShell(serial, `input tap ${sx} ${sy}`);
+      adbShell(serial, ['input', 'tap', String(sx), String(sy)]);
       res.json({ status: 'ok', action: 'tap', x: sx, y: sy });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -36,11 +30,10 @@ export function createInputRoutes(_adb: AdbManager) {
       res.status(400).json({ error: 'serial, x1, y1, x2, y2 required' });
       return;
     }
-
     try {
-      const args = [x1, y1, x2, y2].map(sanitizeCoord);
-      const dur = Math.min(Math.max(Math.floor(duration), 50), 5000);
-      adbShell(serial, `input swipe ${args.join(' ')} ${dur}`);
+      const args = [x1, y1, x2, y2].map(sanitizeCoord).map(String);
+      const dur = String(Math.min(Math.max(Math.floor(duration), 50), 5000));
+      adbShell(serial, ['input', 'swipe', ...args, dur]);
       res.json({ status: 'ok', action: 'swipe' });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -58,22 +51,10 @@ export function createInputRoutes(_adb: AdbManager) {
       res.status(400).json({ error: 'text must be string, max 2000 chars' });
       return;
     }
-
     try {
-      const isAsciiOnly = /^[\x20-\x7E]*$/.test(text);
-
-      if (isAsciiOnly) {
-        // ASCII만: 기존 input text 사용 (빠름)
-        const clean = sanitizeShellArg(text).replace(/ /g, '%s');
-        adbShell(serial, `input text '${clean}'`);
-        res.json({ status: 'ok', action: 'type', method: 'input_text', text });
-      } else {
-        // 한글/이모지: ClipboardReceiver로 클립보드 설정 → 붙여넣기
-        const escaped = text.replace(/'/g, "'\\''");
-        adbShell(serial, `am broadcast -a com.palank.mbot.action.CLIPBOARD_SET -n com.palank.mbot/.receiver.ClipboardReceiver --es text '${escaped}'`);
-        adbShell(serial, `input keyevent 279`);
-        res.json({ status: 'ok', action: 'type', method: 'clipboard_paste', text });
-      }
+      typeText(serial, text);
+      const method = /^[\x20-\x7E]*$/.test(text) ? 'input_text' : 'clipboard_b64';
+      res.json({ status: 'ok', action: 'type', method, text });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -86,10 +67,9 @@ export function createInputRoutes(_adb: AdbManager) {
       res.status(400).json({ error: 'serial, keycode required' });
       return;
     }
-
     try {
       const kc = sanitizeKeycode(keycode);
-      adbShell(serial, `input keyevent ${kc}`);
+      adbShell(serial, ['input', 'keyevent', kc]);
       res.json({ status: 'ok', action: 'keyevent', keycode: kc });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -103,18 +83,17 @@ export function createInputRoutes(_adb: AdbManager) {
       res.status(400).json({ error: 'serial required' });
       return;
     }
-
     try {
       if (uri) {
         const cleanUri = sanitizeShellArg(uri);
-        adbShell(serial, `am start -a android.intent.action.VIEW -d '${cleanUri}'`);
+        adbShell(serial, ['am', 'start', '-a', 'android.intent.action.VIEW', '-d', cleanUri]);
       } else if (pkg && activity) {
         const cleanPkg = sanitizePackage(pkg);
         const cleanAct = sanitizeShellArg(activity);
-        adbShell(serial, `am start -n ${cleanPkg}/${cleanAct}`);
+        adbShell(serial, ['am', 'start', '-n', `${cleanPkg}/${cleanAct}`]);
       } else if (pkg) {
         const cleanPkg = sanitizePackage(pkg);
-        adbShell(serial, `monkey -p ${cleanPkg} -c android.intent.category.LAUNCHER 1`);
+        adbShell(serial, ['monkey', '-p', cleanPkg, '-c', 'android.intent.category.LAUNCHER', '1']);
       } else {
         res.status(400).json({ error: 'package or uri required' });
         return;
