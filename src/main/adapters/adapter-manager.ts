@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync
 import path from 'path';
 import { createRequire } from 'module';
 import { runInThisContext } from 'vm';
+import { net } from 'electron';
 import type { Express } from 'express';
 
 const REGISTRY_URL = 'https://palank.co.kr/adapters/registry.json';
@@ -77,9 +78,10 @@ export class AdapterManager {
   /** 웹 레지스트리에서 어댑터 목록 조회 */
   async fetchRegistry(): Promise<RegistryEntry[]> {
     try {
-      const res = await fetch(REGISTRY_URL);
+      const res = await net.fetch(REGISTRY_URL);
       if (!res.ok) throw new Error(`Registry fetch failed: ${res.status}`);
       const data = await res.json() as { adapters: RegistryEntry[] };
+      console.log(`[AdapterManager] Registry loaded: ${(data.adapters || []).length} adapters`);
       return data.adapters || [];
     } catch (e: any) {
       console.error('[AdapterManager] Registry fetch error:', e.message);
@@ -91,7 +93,7 @@ export class AdapterManager {
   async install(adapterId: string): Promise<{ success: boolean; error?: string }> {
     try {
       const manifestUrl = `${ADAPTER_BASE_URL}/${adapterId}/manifest.json`;
-      const manifestRes = await fetch(manifestUrl);
+      const manifestRes = await net.fetch(manifestUrl);
       if (!manifestRes.ok) return { success: false, error: `manifest.json not found (${manifestRes.status})` };
       const manifestText = await manifestRes.text();
       const manifest = JSON.parse(manifestText);
@@ -105,7 +107,7 @@ export class AdapterManager {
       // config-only 모드: handler.js 대신 config.json만 다운로드
       if (manifest.mode === 'config-only') {
         const configUrl = `${ADAPTER_BASE_URL}/${adapterId}/config.json`;
-        const configRes = await fetch(configUrl);
+        const configRes = await net.fetch(configUrl);
         if (configRes.ok) {
           writeFileSync(path.join(adapterDir, 'config.json'), await configRes.text(), 'utf-8');
         }
@@ -113,7 +115,7 @@ export class AdapterManager {
       } else {
         // 레거시: handler.js 다운로드
         const handlerUrl = `${ADAPTER_BASE_URL}/${adapterId}/handler.js`;
-        const handlerRes = await fetch(handlerUrl);
+        const handlerRes = await net.fetch(handlerUrl);
         if (!handlerRes.ok) return { success: false, error: `handler.js not found (${handlerRes.status})` };
         writeFileSync(path.join(adapterDir, 'handler.js'), await handlerRes.text(), 'utf-8');
         console.log(`[AdapterManager] Installed: ${manifest.name} (${adapterId}) v${manifest.version}`);

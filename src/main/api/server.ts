@@ -22,6 +22,9 @@ import {
 } from './routes/helpers/appHelper.js';
 import { getCenterPoint } from '../utils/uiParser.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export interface ApiServerOptions {
   port?: number;
   adbManager: AdbManager;
@@ -51,8 +54,8 @@ function getLocalIPs(): string[] {
 function loadBuiltinAdapters(expressApp: ReturnType<typeof express>, adbManager: AdbManager): Set<string> {
   const builtinIds = new Set<string>();
 
-  // dist 기준 경로 (tsc 빌드 후)
-  const adaptersDir = path.join(__dirname, 'api', 'routes', 'adapters');
+  // dist 기준 경로: __dirname은 dist/main/api/ → routes/adapters/
+  const adaptersDir = path.join(__dirname, 'routes', 'adapters');
   if (!existsSync(adaptersDir)) {
     console.log('[BuiltinAdapters] No adapters directory found at', adaptersDir);
     return builtinIds;

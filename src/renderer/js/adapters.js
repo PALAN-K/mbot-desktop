@@ -62,11 +62,23 @@ async function refreshAdapters() {
 
 // === Hub 페이지: 레지스트리에서 어댑터 목록 로드 ===
 async function refreshHub() {
-  registryAdapters = await window.mbot.fetchRegistry();
+  try {
+    registryAdapters = await window.mbot.fetchRegistry();
+  } catch (e) {
+    registryAdapters = [];
+    console.error('fetchRegistry error:', e);
+  }
   installedAdapters = await window.mbot.listAdapters();
   const installedIds = new Set(installedAdapters.map(a => a.id));
 
   if (!hubCategories) return;
+
+  if (!registryAdapters || registryAdapters.length === 0) {
+    hubCategories.innerHTML =
+      '<div style="padding:32px;text-align:center;color:#8b949e;font-size:13px;">' +
+      '어댑터 목록을 불러올 수 없습니다. 네트워크를 확인하세요.</div>';
+    return;
+  }
 
   // Featured
   if (hubFeatured) {
