@@ -94,21 +94,31 @@ export class AdapterManager {
       const manifestRes = await fetch(manifestUrl);
       if (!manifestRes.ok) return { success: false, error: `manifest.json not found (${manifestRes.status})` };
       const manifestText = await manifestRes.text();
-
-      const handlerUrl = `${ADAPTER_BASE_URL}/${adapterId}/handler.js`;
-      const handlerRes = await fetch(handlerUrl);
-      if (!handlerRes.ok) return { success: false, error: `handler.js not found (${handlerRes.status})` };
-      const handlerText = await handlerRes.text();
+      const manifest = JSON.parse(manifestText);
 
       const adapterDir = path.join(this.adaptersDir, adapterId);
       if (existsSync(adapterDir)) rmSync(adapterDir, { recursive: true });
       mkdirSync(adapterDir, { recursive: true });
 
       writeFileSync(path.join(adapterDir, 'manifest.json'), manifestText, 'utf-8');
-      writeFileSync(path.join(adapterDir, 'handler.js'), handlerText, 'utf-8');
 
-      const manifest = JSON.parse(manifestText);
-      console.log(`[AdapterManager] Installed: ${manifest.name} (${adapterId}) v${manifest.version}`);
+      // config-only 모드: handler.js 대신 config.json만 다운로드
+      if (manifest.mode === 'config-only') {
+        const configUrl = `${ADAPTER_BASE_URL}/${adapterId}/config.json`;
+        const configRes = await fetch(configUrl);
+        if (configRes.ok) {
+          writeFileSync(path.join(adapterDir, 'config.json'), await configRes.text(), 'utf-8');
+        }
+        console.log(`[AdapterManager] Installed (config-only): ${manifest.name} (${adapterId}) v${manifest.version}`);
+      } else {
+        // 레거시: handler.js 다운로드
+        const handlerUrl = `${ADAPTER_BASE_URL}/${adapterId}/handler.js`;
+        const handlerRes = await fetch(handlerUrl);
+        if (!handlerRes.ok) return { success: false, error: `handler.js not found (${handlerRes.status})` };
+        writeFileSync(path.join(adapterDir, 'handler.js'), await handlerRes.text(), 'utf-8');
+        console.log(`[AdapterManager] Installed: ${manifest.name} (${adapterId}) v${manifest.version}`);
+      }
+
       return { success: true };
     } catch (e: any) {
       console.error(`[AdapterManager] Install error for ${adapterId}:`, e.message);
@@ -151,6 +161,13 @@ export class AdapterManager {
 
     const manifest = this.getManifest(adapterId);
     if (!manifest) return false;
+
+    // config-only 모드: 로직은 빌드타임에 내장되어 있으므로 handler.js 로드 불필요
+    if ((manifest as any).mode === 'config-only') {
+      this.loaded.set(adapterId, { manifest, status: 'running' });
+      console.log(`[AdapterManager] Loaded (config-only): ${manifest.name} (${adapterId}) v${manifest.version}`);
+      return true;
+    }
 
     const handlerPath = path.join(this.adaptersDir, adapterId, 'handler.js');
     if (!existsSync(handlerPath)) return false;
