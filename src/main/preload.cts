@@ -20,6 +20,18 @@ contextBridge.exposeInMainWorld('mbot', {
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
   installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  // Window controls (frameless)
+  winMinimize: () => ipcRenderer.invoke('win:minimize'),
+  winMaximize: () => ipcRenderer.invoke('win:maximize'),
+  winClose: () => ipcRenderer.invoke('win:close'),
+  winIsMaximized: () => ipcRenderer.invoke('win:isMaximized'),
+  // Adapter management
+  listAdapters: () => ipcRenderer.invoke('adapter:list'),
+  fetchRegistry: () => ipcRenderer.invoke('adapter:registry'),
+  installAdapter: (id: string) => ipcRenderer.invoke('adapter:install', id),
+  startAdapter: (id: string) => ipcRenderer.invoke('adapter:start', id),
+  stopAdapter: (id: string) => ipcRenderer.invoke('adapter:stop', id),
+  uninstallAdapter: (id: string) => ipcRenderer.invoke('adapter:uninstall', id),
   onUpdateAvailable: (cb: (version: string) => void) => ipcRenderer.on('update:available', (_e: any, v: string) => cb(v)),
   onUpdateProgress: (cb: (percent: number) => void) => ipcRenderer.on('update:progress', (_e: any, p: number) => cb(p)),
   onUpdateDownloaded: (cb: (version: string) => void) => ipcRenderer.on('update:downloaded', (_e: any, v: string) => cb(v)),

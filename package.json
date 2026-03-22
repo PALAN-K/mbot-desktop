@@ -1,13 +1,14 @@
 {
   "name": "mbot-desktop",
-  "version": "1.6.0",
+  "version": "2.0.0",
   "description": "mbot Desktop — AI Agent Hub for Multi-Phone Control",
   "main": "dist/main/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc && npx shx mkdir -p dist/renderer && npx shx cp src/renderer/index.html dist/renderer/index.html",
+    "copy-renderer": "npx shx rm -rf dist/renderer && npx shx cp -r src/renderer dist/renderer",
+    "build": "tsc && npm run copy-renderer",
     "start": "npm run build && electron .",
-    "dev": "tsc && npx shx cp src/renderer/index.html dist/renderer/index.html && electron .",
+    "dev": "tsc && npm run copy-renderer && electron .",
     "build:win": "electron-builder --win",
     "dist": "npm run build && electron-builder --win"
   },

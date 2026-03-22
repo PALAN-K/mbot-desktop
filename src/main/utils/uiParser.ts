@@ -7,6 +7,8 @@ export interface UiElement {
   bounds: [number, number, number, number]; // [x1, y1, x2, y2]
   clickable: boolean;
   scrollable: boolean;
+  focused: boolean;
+  selected: boolean;
 }
 
 /** uiautomator dump XML → UiElement[] */
@@ -20,7 +22,11 @@ export function parseUiDump(xml: string): UiElement[] {
 
     const text = extractAttr(node, 'text');
     const contentDesc = extractAttr(node, 'content-desc');
-    if (!text && !contentDesc) continue; // 텍스트 없는 노드 스킵
+    const resourceId = extractAttr(node, 'resource-id');
+    const className = extractAttr(node, 'class');
+    // text/contentDesc/resourceId 중 하나라도 있거나, 상호작용 가능한 위젯이면 파싱
+    const isInteractive = className.includes('EditText') || className.includes('SearchView') || className.includes('Button');
+    if (!text && !contentDesc && !resourceId && !isInteractive) continue;
 
     const boundsStr = extractAttr(node, 'bounds');
     const boundsMatch = boundsStr.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
@@ -28,9 +34,9 @@ export function parseUiDump(xml: string): UiElement[] {
 
     elements.push({
       text,
-      className: extractAttr(node, 'class'),
+      className,
       package: extractAttr(node, 'package'),
-      resourceId: extractAttr(node, 'resource-id'),
+      resourceId,
       contentDesc,
       bounds: [
         parseInt(boundsMatch[1]),
@@ -40,6 +46,8 @@ export function parseUiDump(xml: string): UiElement[] {
       ],
       clickable: extractAttr(node, 'clickable') === 'true',
       scrollable: extractAttr(node, 'scrollable') === 'true',
+      focused: extractAttr(node, 'focused') === 'true',
+      selected: extractAttr(node, 'selected') === 'true',
     });
   }
 

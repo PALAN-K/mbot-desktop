@@ -4,909 +4,232 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>mbot Desktop</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
-      background: #111827;
-      color: #e5e7eb;
-      min-height: 100vh;
-    }
-
-    /* Header */
-    header {
-      background: #1f2937;
-      padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid #374151;
-      -webkit-app-region: drag;
-    }
-    header h1 {
-      font-size: 18px;
-      font-weight: 700;
-      color: #f9fafb;
-      letter-spacing: -0.3px;
-    }
-    header h1 span { color: #60a5fa; }
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      -webkit-app-region: no-drag;
-    }
-    .device-count {
-      font-size: 12px;
-      color: #9ca3af;
-      background: #374151;
-      padding: 4px 10px;
-      border-radius: 20px;
-    }
-
-    /* Main */
-    main { padding: 20px 24px; }
-
-    /* Section */
-    .section-label {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: #6b7280;
-      margin-bottom: 12px;
-    }
-
-    /* Device Cards */
-    .device-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 14px;
-    }
-    .device-card {
-      background: #1f2937;
-      border-radius: 14px;
-      padding: 18px;
-      border: 1px solid #374151;
-      transition: border-color 0.2s;
-    }
-    .device-card:hover { border-color: #4b5563; }
-    .device-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    .device-name {
-      font-size: 15px;
-      font-weight: 600;
-      color: #f9fafb;
-    }
-    .device-status {
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 20px;
-      font-weight: 500;
-    }
-    .status-connected { background: #065f46; color: #6ee7b7; }
-    .status-wireless { background: #1e3a5f; color: #93c5fd; }
-    .device-meta {
-      font-size: 12px;
-      color: #9ca3af;
-      margin-bottom: 14px;
-    }
-    .device-meta span { color: #6b7280; }
-
-    /* Action Buttons */
-    .device-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    button {
-      border: none;
-      padding: 8px 14px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      transition: all 0.15s;
-      color: #fff;
-    }
-    button:hover { transform: translateY(-1px); }
-    button:active { transform: translateY(0); }
-    button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #2563eb, #3b82f6);
-      padding: 8px 20px;
-      font-size: 13px;
-    }
-    .btn-primary:hover { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
-
-    .btn-secondary {
-      background: #374151;
-      color: #d1d5db;
-      font-size: 12px;
-      padding: 6px 12px;
-    }
-    .btn-secondary:hover { background: #4b5563; }
-
-    .btn-ghost {
-      background: transparent;
-      color: #9ca3af;
-      font-size: 12px;
-      padding: 6px 12px;
-    }
-    .btn-ghost:hover { background: #374151; color: #d1d5db; }
-
-    .btn-header {
-      background: #374151;
-      color: #d1d5db;
-      font-size: 12px;
-      padding: 6px 14px;
-    }
-    .btn-header:hover { background: #4b5563; }
-
-    /* Nearby Section */
-    .nearby-section { margin-top: 28px; }
-    .nearby-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    .discover-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 10px;
-    }
-    .discover-card {
-      background: #1f2937;
-      border: 1px dashed #374151;
-      border-radius: 10px;
-      padding: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .discover-info h4 {
-      font-size: 13px;
-      color: #d1d5db;
-      font-weight: 500;
-    }
-    .discover-info p {
-      font-size: 11px;
-      color: #6b7280;
-      margin-top: 2px;
-    }
-    .discover-empty {
-      font-size: 13px;
-      color: #6b7280;
-      padding: 16px;
-      text-align: center;
-      background: #1f2937;
-      border-radius: 10px;
-      border: 1px dashed #374151;
-    }
-
-    /* Pairing Form */
-    .pair-form {
-      margin-top: 10px;
-      padding: 12px;
-      background: #111827;
-      border-radius: 8px;
-      border: 1px solid #374151;
-    }
-    .pair-form p {
-      font-size: 11px;
-      color: #9ca3af;
-      margin-bottom: 8px;
-      line-height: 1.5;
-    }
-    .pair-inputs {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .pair-inputs input {
-      background: #1f2937;
-      border: 1px solid #4b5563;
-      border-radius: 6px;
-      color: #f9fafb;
-      padding: 6px 10px;
-      font-size: 13px;
-      font-family: 'Cascadia Code', monospace;
-      outline: none;
-    }
-    .pair-inputs input:focus { border-color: #3b82f6; }
-    .pair-inputs input.pair-port { width: 70px; }
-    .pair-inputs input.pair-code { width: 90px; }
-
-    /* Empty State */
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-    }
-    .empty-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-      opacity: 0.3;
-    }
-    .empty-state h2 {
-      font-size: 16px;
-      color: #9ca3af;
-      font-weight: 500;
-      margin-bottom: 8px;
-    }
-    .empty-state p {
-      font-size: 13px;
-      color: #6b7280;
-      line-height: 1.7;
-    }
-
-    /* Onboarding Wizard */
-    .onboarding {
-      max-width: 560px;
-      margin: 0 auto;
-      padding: 40px 20px;
-    }
-    .onboarding-title {
-      font-size: 22px;
-      font-weight: 700;
-      color: #f9fafb;
-      text-align: center;
-      margin-bottom: 6px;
-    }
-    .onboarding-subtitle {
-      font-size: 13px;
-      color: #9ca3af;
-      text-align: center;
-      margin-bottom: 32px;
-    }
-    .usecase-cards {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-bottom: 28px;
-    }
-    .usecase-card {
-      background: #1f2937;
-      border: 2px solid #374151;
-      border-radius: 14px;
-      padding: 22px 18px;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-    }
-    .usecase-card:hover { border-color: #4b5563; }
-    .usecase-icon { font-size: 32px; margin-bottom: 10px; }
-    .usecase-card h3 {
-      font-size: 14px;
-      font-weight: 600;
-      color: #f9fafb;
-      margin-bottom: 6px;
-    }
-    .usecase-card p {
-      font-size: 12px;
-      color: #9ca3af;
-      line-height: 1.5;
-    }
-
-    /* Guide Steps */
-    .guide-section {
-      background: #1f2937;
-      border-radius: 14px;
-      padding: 24px;
-      border: 1px solid #374151;
-    }
-    .guide-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: #f9fafb;
-      margin-bottom: 4px;
-    }
-    .guide-desc {
-      font-size: 12px;
-      color: #6b7280;
-      margin-bottom: 18px;
-    }
-    .guide-tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 18px;
-    }
-    .guide-tab {
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      background: #374151;
-      color: #9ca3af;
-      border: none;
-    }
-    .guide-tab.active { background: #2563eb; color: #fff; }
-    .step-list { list-style: none; padding: 0; }
-    .step-list li {
-      position: relative;
-      padding: 8px 0 8px 28px;
-      font-size: 13px;
-      color: #d1d5db;
-      line-height: 1.6;
-    }
-    .step-list li::before {
-      content: attr(data-step);
-      position: absolute;
-      left: 0;
-      width: 20px;
-      height: 20px;
-      background: #374151;
-      color: #9ca3af;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 600;
-      top: 9px;
-    }
-    .step-list li .step-hint {
-      display: block;
-      font-size: 11px;
-      color: #6b7280;
-      margin-top: 2px;
-    }
-    .guide-footer {
-      margin-top: 18px;
-      text-align: center;
-    }
-
-    /* Log Panel */
-    .log-toggle {
-      margin-top: 20px;
-      text-align: center;
-    }
-    .log-panel {
-      margin-top: 8px;
-      background: #0f172a;
-      border: 1px solid #1e293b;
-      border-radius: 8px;
-      padding: 12px 14px;
-      font-family: 'Cascadia Code', 'Fira Code', monospace;
-      font-size: 11px;
-      max-height: 150px;
-      overflow-y: auto;
-      line-height: 1.7;
-    }
-    .log-panel .log-entry { color: #64748b; }
-    .log-panel .log-success { color: #4ade80; }
-    .log-panel .log-error { color: #f87171; }
-
-    /* Update Banner */
-    .update-banner {
-      background: linear-gradient(135deg, #1e3a5f, #1e293b);
-      border-bottom: 1px solid #2563eb;
-      padding: 8px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 13px;
-      color: #93c5fd;
-      display: none;
-    }
-    .update-banner span { flex: 1; }
-    .update-banner .update-link {
-      background: #2563eb;
-      color: #fff;
-      border: none;
-      padding: 5px 14px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      margin-left: 12px;
-    }
-    .update-banner .update-link:hover { background: #1d4ed8; }
-    .update-banner .update-dismiss {
-      background: none;
-      border: none;
-      color: #6b7280;
-      cursor: pointer;
-      font-size: 16px;
-      margin-left: 8px;
-      padding: 0 4px;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <h1><span>mbot</span> Desktop</h1>
-    <div class="header-right">
-      <span class="device-count" id="statusText">...</span>
-      <button class="btn-header" id="refreshBtn">새로고침</button>
-    </div>
-  </header>
 
-  <div class="update-banner" id="updateBanner">
-    <span id="updateText"></span>
-    <button class="update-link" id="updateBtn">다운로드</button>
-    <button class="update-dismiss" id="updateDismiss">&times;</button>
+<!-- Custom Title Bar -->
+<div class="titlebar">
+  <div class="logo">&#9889; mbot Desktop</div>
+  <input class="search" placeholder="Search adapters, devices..." />
+  <span class="search-hint">Ctrl+K</span>
+  <div class="tb-right">
+    <button title="Settings" onclick="nav('settings')">&#9881;</button>
   </div>
+  <div class="win-controls">
+    <button onclick="window.mbot.winMinimize()">&#8212;</button>
+    <button id="maxBtn" onclick="window.mbot.winMaximize()">&#9633;</button>
+    <button class="close" onclick="window.mbot.winClose()">&#10005;</button>
+  </div>
+</div>
 
-  <main>
-    <!-- Connected Devices -->
-    <div class="section-label" id="connectedLabel" style="display:none;">내 기기</div>
-    <div id="deviceGrid" class="device-grid"></div>
-    <div id="emptyState" style="display:none;">
-      <div class="onboarding" id="onboarding">
-        <div class="onboarding-title">mbot Desktop에 오신 것을 환영합니다</div>
-        <div class="onboarding-subtitle">폰 미러링 + AI 제어를 하나의 화면에서</div>
+<!-- Update Banner -->
+<div class="update-banner" id="updateBanner">
+  <span id="updateText"></span>
+  <button class="update-link" id="updateBtn">다운로드</button>
+  <button class="update-dismiss" id="updateDismiss">&times;</button>
+</div>
 
-        <!-- What you can do -->
-        <div class="usecase-cards" style="margin-bottom:20px;">
-          <div class="usecase-card" style="cursor:default; border-color:#374151;">
-            <div class="usecase-icon">📱</div>
-            <h3>폰 미러링</h3>
-            <p>PC에서 폰 화면 실시간 미러링<br>카카오톡, 앱 자유롭게 사용</p>
-          </div>
-          <div class="usecase-card" style="cursor:default; border-color:#374151;">
-            <div class="usecase-icon">🤖</div>
-            <h3>AI 제어</h3>
-            <p>AI가 폰 + PC를 동시 제어<br>텔레그램으로 명령, 자동 실행</p>
-          </div>
-        </div>
+<div class="layout">
 
-        <!-- Connection Guide -->
-        <div class="guide-section">
-          <div class="guide-title">폰 연결하기</div>
-          <div class="guide-desc">Android 버전에 맞는 방법을 선택하세요</div>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-item active" data-page="devices" onclick="nav('devices')">
+      <span class="s-icon">&#128241;</span> Devices
+      <span class="badge" id="sidebarDeviceCount" style="display:none;">0</span>
+    </div>
 
-          <div class="guide-tabs">
-            <button class="guide-tab active" onclick="switchGuideTab('wireless', this)">Android 11+ (무선)</button>
-            <button class="guide-tab" onclick="switchGuideTab('usb', this)">Android 10 이하 (USB)</button>
-          </div>
+    <div class="sidebar-sep"></div>
 
-          <div id="guideWireless">
-            <ol class="step-list">
-              <li data-step="1">
-                설정 → 개발자 옵션 ON
-                <span class="step-hint">빌드 번호를 7회 탭하면 개발자 옵션이 나타납니다</span>
-              </li>
-              <li data-step="2">
-                무선 디버깅 ON
-                <span class="step-hint">개발자 옵션 → 무선 디버깅 활성화</span>
-              </li>
-              <li data-step="3">
-                아래 주변 기기에서 검색 클릭
-                <span class="step-hint">자동으로 디바이스를 발견합니다</span>
-              </li>
-              <li data-step="4">
-                연결 → 미러링 버튼 클릭
-                <span class="step-hint">연결 즉시 미러링 + AI 제어 모두 사용 가능</span>
-              </li>
-            </ol>
-          </div>
+    <div class="sidebar-item" data-page="adapters" onclick="nav('adapters')">
+      <span class="s-icon">&#128230;</span> Adapters
+    </div>
 
-          <div id="guideUsb" style="display:none;">
-            <ol class="step-list">
-              <li data-step="1">
-                설정 → 개발자 옵션 ON
-                <span class="step-hint">빌드 번호를 7회 탭하면 개발자 옵션이 나타납니다</span>
-              </li>
-              <li data-step="2">
-                USB 디버깅 ON
-                <span class="step-hint">개발자 옵션 → USB 디버깅 활성화</span>
-              </li>
-              <li data-step="3">
-                USB 케이블로 PC와 폰 연결
-                <span class="step-hint">폰에서 "USB 디버깅 허용" 팝업이 나오면 허용</span>
-              </li>
-              <li data-step="4">
-                무선 전환 버튼 클릭 → USB 분리
-                <span class="step-hint">이후 무선으로 자동 연결됩니다</span>
-              </li>
-            </ol>
-          </div>
-        </div>
+    <div class="sidebar-sep"></div>
 
-        <div class="guide-footer">
-          <button class="btn-primary" onclick="closeOnboarding()">mbot Desktop 시작하기</button>
-        </div>
+    <div class="sidebar-label">Installed</div>
+    <div id="sidebarAdapters"></div>
+
+    <div class="sidebar-sep"></div>
+
+    <div class="sidebar-item" data-page="hub" onclick="nav('hub')">
+      <span class="s-icon">&#127978;</span> Adapter Hub
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-item" data-page="settings" onclick="nav('settings')">
+        <span class="s-icon">&#9881;</span> Settings
+      </div>
+      <div class="status-bar">
+        <span class="engine-dot"></span>
+        <span>Engine running</span>
+        <span id="versionText" style="margin-left:auto;">v2.0.0</span>
       </div>
     </div>
+  </div>
 
-    <!-- Nearby Devices -->
-    <div class="nearby-section">
-      <div class="nearby-header">
-        <div class="section-label" style="margin:0;">주변 기기</div>
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ========== Devices Page ========== -->
+    <div class="page active" id="p-devices">
+      <div class="page-title">Devices</div>
+      <div class="page-sub">연결된 디바이스 관리 &middot; 미러링 &middot; AI 제어</div>
+
+      <div class="section-title" id="connectedLabel" style="display:none;">내 기기</div>
+      <div id="deviceGrid" class="device-grid"></div>
+
+      <div id="emptyState" style="display:none;">
+        <div class="onboarding" id="onboarding">
+          <div class="onboarding-title">mbot Desktop에 오신 것을 환영합니다</div>
+          <div class="onboarding-subtitle">폰 미러링 + AI 제어를 하나의 화면에서</div>
+
+          <div class="usecase-cards" style="margin-bottom:20px;">
+            <div class="usecase-card">
+              <div class="usecase-icon">&#128241;</div>
+              <h3>폰 미러링</h3>
+              <p>PC에서 폰 화면 실시간 미러링<br>카카오톡, 앱 자유롭게 사용</p>
+            </div>
+            <div class="usecase-card">
+              <div class="usecase-icon">&#129302;</div>
+              <h3>AI 제어</h3>
+              <p>AI가 폰 + PC를 동시 제어<br>텔레그램으로 명령, 자동 실행</p>
+            </div>
+          </div>
+
+          <div class="guide-section">
+            <div class="guide-title">폰 연결하기</div>
+            <div class="guide-desc">Android 버전에 맞는 방법을 선택하세요</div>
+
+            <div class="guide-tabs">
+              <button class="guide-tab active" onclick="switchGuideTab('wireless', this)">Android 11+ (무선)</button>
+              <button class="guide-tab" onclick="switchGuideTab('usb', this)">Android 10 이하 (USB)</button>
+            </div>
+
+            <div id="guideWireless">
+              <ol class="step-list">
+                <li data-step="1">설정 &rarr; 개발자 옵션 ON<span class="step-hint">빌드 번호를 7회 탭하면 개발자 옵션이 나타납니다</span></li>
+                <li data-step="2">무선 디버깅 ON<span class="step-hint">개발자 옵션 &rarr; 무선 디버깅 활성화</span></li>
+                <li data-step="3">아래 주변 기기에서 검색 클릭<span class="step-hint">자동으로 디바이스를 발견합니다</span></li>
+                <li data-step="4">연결 &rarr; 미러링 버튼 클릭<span class="step-hint">연결 즉시 미러링 + AI 제어 모두 사용 가능</span></li>
+              </ol>
+            </div>
+
+            <div id="guideUsb" style="display:none;">
+              <ol class="step-list">
+                <li data-step="1">설정 &rarr; 개발자 옵션 ON<span class="step-hint">빌드 번호를 7회 탭하면 개발자 옵션이 나타납니다</span></li>
+                <li data-step="2">USB 디버깅 ON<span class="step-hint">개발자 옵션 &rarr; USB 디버깅 활성화</span></li>
+                <li data-step="3">USB 케이블로 PC와 폰 연결<span class="step-hint">폰에서 "USB 디버깅 허용" 팝업이 나오면 허용</span></li>
+                <li data-step="4">무선 전환 버튼 클릭 &rarr; USB 분리<span class="step-hint">이후 무선으로 자동 연결됩니다</span></li>
+              </ol>
+            </div>
+          </div>
+
+          <div class="guide-footer">
+            <button class="btn-primary" onclick="closeOnboarding()">mbot Desktop 시작하기</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:24px;">
+        주변 기기
         <button class="btn-ghost" id="scanBtn">검색</button>
       </div>
       <div id="discoverGrid"></div>
+
+      <div class="log-toggle">
+        <button class="btn-ghost" id="logToggleBtn" style="display:none;">로그 보기</button>
+      </div>
+      <div id="logPanel" class="log-panel" style="display:none;"></div>
     </div>
 
-    <!-- Log -->
-    <div class="log-toggle">
-      <button class="btn-ghost" id="logToggleBtn" style="display:none;">로그 보기</button>
-    </div>
-    <div id="logPanel" class="log-panel" style="display:none;"></div>
-  </main>
+    <!-- ========== Adapters Page ========== -->
+    <div class="page" id="p-adapters">
+      <div class="page-title">Adapters</div>
+      <div class="page-sub">설치된 어댑터 관리 &middot; 실행/중지 &middot; 로그</div>
 
-  <script>
-    const grid = document.getElementById('deviceGrid');
-    const emptyState = document.getElementById('emptyState');
-    const connectedLabel = document.getElementById('connectedLabel');
-    const statusText = document.getElementById('statusText');
-    const logPanel = document.getElementById('logPanel');
-    const logToggleBtn = document.getElementById('logToggleBtn');
-    const discoverGrid = document.getElementById('discoverGrid');
-
-    const originalTimeouts = {};
-    let connectedSerials = new Set();
-    let logVisible = false;
-    let onboardingDismissed = localStorage.getItem('onboardingDone') === '1';
-
-    // === Onboarding ===
-    function switchGuideTab(tab, btn) {
-      document.querySelectorAll('.guide-tab').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('guideWireless').style.display = tab === 'wireless' ? 'block' : 'none';
-      document.getElementById('guideUsb').style.display = tab === 'usb' ? 'block' : 'none';
-    }
-
-    function closeOnboarding() {
-      onboardingDismissed = true;
-      localStorage.setItem('onboardingDone', '1');
-      emptyState.style.display = 'none';
-      refreshAll();
-    }
-
-    // === Log ===
-    function log(msg, type = 'entry') {
-      logToggleBtn.style.display = 'inline-block';
-      const entry = document.createElement('div');
-      entry.className = `log-${type}`;
-      const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      entry.textContent = `${time}  ${msg}`;
-      logPanel.appendChild(entry);
-      logPanel.scrollTop = logPanel.scrollHeight;
-    }
-
-    logToggleBtn.addEventListener('click', () => {
-      logVisible = !logVisible;
-      logPanel.style.display = logVisible ? 'block' : 'none';
-      logToggleBtn.textContent = logVisible ? '로그 숨기기' : '로그 보기';
-    });
-
-    // === Mirror ===
-    async function onMirror(serial) {
-      log(`미러링 시작 중...`);
-      try {
-        const ok = await window.mbot.startMirror(serial);
-        log(ok ? '미러링 시작됨' : '미러링 실패', ok ? 'success' : 'error');
-      } catch (e) {
-        log(`미러링 오류: ${e.message}`, 'error');
-      }
-    }
-
-    // === Stability (auto-apply on mirror) ===
-    async function onStability(serial) {
-      try {
-        const result = await window.mbot.setupStability(serial);
-        originalTimeouts[serial] = result.originalTimeout;
-        const ok = result.stayAwake && result.stayOnPlugged;
-        log(`안정성 설정: ${ok ? '완료' : '일부 적용'}`, ok ? 'success' : 'entry');
-      } catch (e) {
-        log(`안정성 설정 오류`, 'error');
-      }
-    }
-
-    // === Go Wireless ===
-    async function onGoWireless(serial) {
-      log('무선 전환 중...');
-      try {
-        const result = await window.mbot.enableWireless(serial);
-        if (result) {
-          log(`무선 연결 완료 (${result.ip}) — USB 분리 가능`, 'success');
-          setTimeout(refreshAll, 2000);
-        } else {
-          log('Wi-Fi 연결을 확인하세요', 'error');
-        }
-      } catch (e) {
-        log(`무선 전환 오류`, 'error');
-      }
-    }
-
-    // === Restore ===
-    async function onRestore(serial) {
-      const timeout = originalTimeouts[serial] || '60000';
-      try {
-        await window.mbot.restoreStability(serial, timeout);
-        log('설정 복원 완료', 'success');
-      } catch (e) {
-        log('설정 복원 실패', 'error');
-      }
-    }
-
-    // === Forget (ADB disconnect + 저장소에서 제거) ===
-    async function onForgetDevice(serial) {
-      try {
-        await window.mbot.forgetDevice(serial);
-        log(`${serial} 연결 해제 완료`, 'success');
-      } catch (e) {
-        log('연결 해제 실패', 'error');
-      }
-      refreshAll();
-    }
-
-    // === Mirror + Stability combo ===
-    async function onMirrorWithStability(serial) {
-      await onStability(serial);
-      await onMirror(serial);
-    }
-
-    // === Nearby ===
-    async function onScanDevices() {
-      discoverGrid.innerHTML = '<div class="discover-empty">검색 중...</div>';
-      try {
-        const discovered = await window.mbot.discoverDevices();
-        const newDevices = discovered.filter(dev => {
-          const serial = dev.name.replace('adb-', '');
-          return !connectedSerials.has(serial) && !connectedSerials.has(`${dev.ip}:${dev.port}`);
-        });
-
-        if (newDevices.length === 0) {
-          const msg = discovered.length > 0
-            ? '주변 기기가 모두 연결되어 있습니다.'
-            : '기기를 찾을 수 없습니다. 무선 디버깅이 켜져 있는지 확인하세요.';
-          discoverGrid.innerHTML = `<div class="discover-empty">${msg}</div>`;
-          return;
-        }
-
-        discoverGrid.innerHTML = '';
-        for (const dev of newDevices) {
-          const displayName = dev.name.replace('adb-', '').substring(0, 16);
-          const isTls = dev.service.includes('tls-connect');
-          const cardId = `card-${dev.name.replace(/[^a-zA-Z0-9]/g, '')}`;
-          const card = document.createElement('div');
-          card.className = 'discover-card';
-          card.style.flexWrap = 'wrap';
-          card.id = cardId;
-          card.innerHTML = `
-            <div class="discover-info">
-              <h4>${displayName}</h4>
-              <p>${dev.ip}${isTls ? ' · Android 11+' : ''}</p>
-            </div>
-            <button class="btn-primary" style="padding:6px 14px;font-size:12px;"
-              onclick="onAutoConnect('${dev.ip}', ${dev.port}, '${dev.name}', '${dev.service}', this, '${cardId}')">
-              연결
-            </button>
-          `;
-          discoverGrid.appendChild(card);
-        }
-      } catch (e) {
-        discoverGrid.innerHTML = '<div class="discover-empty">검색 실패</div>';
-      }
-    }
-
-    async function onAutoConnect(ip, port, deviceName, service, btn, cardId) {
-      btn.disabled = true;
-      btn.textContent = '연결 중...';
-      try {
-        const ok = await window.mbot.connectDevice(ip, port, deviceName || undefined);
-        if (ok) {
-          btn.textContent = '연결됨!';
-          log(`${ip} 연결 완료 (저장됨)`, 'success');
-          await refreshDevices();
-          setTimeout(onScanDevices, 500);
-        } else if (service.includes('tls-connect')) {
-          // TLS 기기 연결 실패 → 페어링 필요
-          btn.textContent = '페어링 필요';
-          btn.disabled = false;
-          btn.onclick = () => showPairForm(ip, port, deviceName, cardId, btn);
-          showPairForm(ip, port, deviceName, cardId, btn);
-        } else {
-          btn.textContent = '실패';
-          btn.disabled = false;
-          if (deviceName) await window.mbot.removeMdnsCache(deviceName);
-          setTimeout(() => { btn.textContent = '연결'; }, 2000);
-        }
-      } catch (e) {
-        btn.textContent = '오류';
-        btn.disabled = false;
-        if (deviceName) await window.mbot.removeMdnsCache(deviceName);
-      }
-    }
-
-    function showPairForm(ip, connectPort, deviceName, cardId, originalBtn) {
-      const card = document.getElementById(cardId);
-      if (!card || card.querySelector('.pair-form')) return;
-      originalBtn.style.display = 'none';
-
-      const form = document.createElement('div');
-      form.className = 'pair-form';
-      form.style.width = '100%';
-      form.innerHTML = `
-        <p>
-          <b>최초 1회 페어링이 필요합니다.</b><br>
-          폰 <b>설정 → 개발자 옵션 → "무선 디버깅" 글자를 탭</b> → 상세 화면 진입<br>
-          → <b>"페어링 코드로 기기 페어링"</b> 탭 → 팝업에 표시된 값 입력
-        </p>
-        <div class="pair-inputs">
-          <input class="pair-port" type="text" placeholder="포트 5자리" maxlength="5" inputmode="numeric" style="width:80px;">
-          <input class="pair-code" type="text" placeholder="코드 6자리" maxlength="6" inputmode="numeric" style="width:80px;">
-          <button class="btn-primary" style="padding:6px 14px;font-size:12px;" id="pairBtn-${cardId}">페어링</button>
-          <button class="btn-ghost" style="padding:6px 8px;font-size:11px;" id="pairCancel-${cardId}">취소</button>
+      <div class="adapter-table">
+        <div class="at-header">
+          <span></span><span>NAME</span><span>STATUS</span><span>TARGET</span><span>VERSION</span>
         </div>
-      `;
-      card.appendChild(form);
-
-      const portInput = form.querySelector('.pair-port');
-      const codeInput = form.querySelector('.pair-code');
-      const pairBtn = form.querySelector('#pairBtn-' + cardId);
-      const cancelBtn = form.querySelector('#pairCancel-' + cardId);
-
-      cancelBtn.onclick = () => {
-        form.remove();
-        originalBtn.style.display = '';
-        originalBtn.textContent = '페어링';
-      };
-
-      pairBtn.onclick = async () => {
-        const pairPort = parseInt(portInput.value.trim());
-        const code = codeInput.value.trim();
-        if (!pairPort || !code || code.length < 6) {
-          log('포트와 6자리 코드를 모두 입력하세요', 'error');
-          return;
-        }
-
-        pairBtn.disabled = true;
-        pairBtn.textContent = '페어링 중...';
-        log(`페어링 시도: ${ip}:${pairPort}`);
-
-        try {
-          const paired = await window.mbot.pairDevice(ip, pairPort, code);
-          if (paired) {
-            log(`페어링 성공! 연결 중...`, 'success');
-            pairBtn.textContent = '연결 중...';
-
-            // 페어링 성공 후 connect (connect 포트 사용)
-            const connected = await window.mbot.connectDevice(ip, connectPort, deviceName);
-            if (connected) {
-              log(`${ip} 연결 완료 (저장됨)`, 'success');
-              await refreshDevices();
-              setTimeout(onScanDevices, 500);
-            } else {
-              // connect 포트가 변경됐을 수 있음 → mDNS 재탐색
-              log('페어링 완료. 검색 후 다시 연결하세요.', 'entry');
-              setTimeout(onScanDevices, 1000);
-            }
-          } else {
-            pairBtn.disabled = false;
-            pairBtn.textContent = '페어링';
-            log('페어링 실패 — 코드를 다시 확인하세요', 'error');
-          }
-        } catch (e) {
-          pairBtn.disabled = false;
-          pairBtn.textContent = '페어링';
-          log('페어링 오류', 'error');
-        }
-      };
-
-      // 포트 입력 후 Tab → 코드로 이동, 코드 입력 후 Enter → 페어링
-      portInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') codeInput.focus(); });
-      codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') pairBtn.click(); });
-      portInput.focus();
-    }
-
-    // === Device List ===
-    async function refreshDevices() {
-      const devices = await window.mbot.listDevices();
-      connectedSerials = new Set(devices.map(d => d.serial));
-
-      if (devices.length === 0) {
-        grid.style.display = 'none';
-        connectedLabel.style.display = 'none';
-        emptyState.style.display = 'block';
-        statusText.textContent = '기기 없음';
-        return;
-      }
-      emptyState.style.display = 'none';
-
-      grid.style.display = 'grid';
-      connectedLabel.style.display = 'block';
-      emptyState.style.display = 'none';
-      statusText.textContent = `${devices.length}대 연결됨`;
-      grid.innerHTML = '';
-
-      for (const device of devices) {
-        const info = await window.mbot.getDeviceInfo(device.serial);
-        const isWireless = device.serial.includes(':');
-        const name = info?.model || device.serial;
-        const android = info?.androidVersion || '?';
-
-        const card = document.createElement('div');
-        card.className = 'device-card';
-        card.innerHTML = `
-          <div class="device-header">
-            <div class="device-name">${name}</div>
-            <span class="device-status ${isWireless ? 'status-wireless' : 'status-connected'}">
-              ${isWireless ? '무선' : 'USB'}
-            </span>
+        <div id="adapterRows">
+          <div style="padding:32px;text-align:center;color:#8b949e;font-size:13px;">
+            설치된 어댑터가 없습니다. Adapter Hub에서 설치하세요.
           </div>
-          <div class="device-meta">
-            Android ${android}
-            ${isWireless ? `<span>&middot; ${device.serial.split(':')[0]}</span>` : ''}
-          </div>
-          <div class="device-actions">
-            <button class="btn-primary" onclick="onMirrorWithStability('${device.serial}')">미러링</button>
-            ${!isWireless ? `<button class="btn-secondary" onclick="onGoWireless('${device.serial}')">무선 전환</button>` : ''}
-            ${isWireless ? `<button class="btn-ghost" onclick="onForgetDevice('${device.serial}')">연결 해제</button>` : ''}
-            <button class="btn-ghost" onclick="onRestore('${device.serial}')">설정 복원</button>
-          </div>
-        `;
-        grid.appendChild(card);
-      }
-    }
+        </div>
+      </div>
+    </div>
 
-    // === Auto Update ===
-    const updateBanner = document.getElementById('updateBanner');
-    const updateText = document.getElementById('updateText');
-    const updateBtn = document.getElementById('updateBtn');
-    const updateDismiss = document.getElementById('updateDismiss');
+    <!-- ========== Adapter Hub Page ========== -->
+    <div class="page" id="p-hub">
+      <div class="page-title">Adapter Hub</div>
+      <div class="page-sub">앱 자동화 어댑터를 검색하고 설치하세요</div>
 
-    window.mbot.onUpdateAvailable((version) => {
-      updateText.textContent = `새 버전 v${version} 다운로드 중...`;
-      updateBanner.style.display = 'flex';
-      updateBtn.style.display = 'none';
-      updateDismiss.onclick = () => { updateBanner.style.display = 'none'; };
-    });
+      <div class="hub-search">
+        <input placeholder="어댑터 검색..." />
+        <button class="btn-primary">검색</button>
+      </div>
 
-    window.mbot.onUpdateProgress((percent) => {
-      updateText.textContent = `업데이트 다운로드 중... ${percent}%`;
-    });
+      <div class="hub-featured"></div>
+      <div id="hubCategories">
+        <div style="padding:32px;text-align:center;color:#8b949e;font-size:13px;">
+          어댑터 목록을 불러오는 중...
+        </div>
+      </div>
+    </div>
 
-    window.mbot.onUpdateDownloaded((version) => {
-      updateText.textContent = `v${version} 다운로드 완료`;
-      updateBtn.textContent = '재시작';
-      updateBtn.style.display = 'inline-block';
-      updateBtn.onclick = () => window.mbot.installUpdate();
-    });
+    <!-- ========== Settings Page ========== -->
+    <div class="page" id="p-settings">
+      <div class="page-title">Settings</div>
+      <div class="page-sub">앱 설정 및 정보</div>
 
-    window.mbot.onUpdateError((msg) => {
-      updateText.textContent = `업데이트 실패 — 재시작하면 자동 재시도됩니다`;
-      updateBtn.textContent = '닫기';
-      updateBtn.style.display = 'inline-block';
-      updateBtn.onclick = () => { updateBanner.style.display = 'none'; };
-      console.error('[Update Error]', msg);
-    });
+      <div class="settings-group">
+        <h3>일반</h3>
+        <div class="setting-row">
+          <span class="setting-label">버전</span>
+          <span class="setting-value" id="settingsVersion">-</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">API 서버 포트</span>
+          <span class="setting-value">8765</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">어댑터 저장 위치</span>
+          <span class="setting-value">%APPDATA%/mbot-desktop/adapters/</span>
+        </div>
+      </div>
 
-    async function refreshAll() {
-      await refreshDevices();
-      await onScanDevices();
-    }
+      <div class="settings-group">
+        <h3>업데이트</h3>
+        <div class="setting-row">
+          <span class="setting-label">자동 업데이트</span>
+          <span class="setting-value">활성</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">업데이트 채널</span>
+          <span class="setting-value">stable</span>
+        </div>
+      </div>
 
-    // 앱 시작 시 저장된 기기 자동 재연결
-    async function autoReconnect() {
-      try {
-        const result = await window.mbot.reconnectSavedDevices();
-        if (result.total === 0) return;
-        if (result.success.length > 0) {
-          log(`자동 재연결: ${result.success.join(', ')}`, 'success');
-        }
-        if (result.failed.length > 0) {
-          log(`재연결 실패 (USB 재연결 필요): ${result.failed.join(', ')}`, 'error');
-        }
-      } catch (e) {
-        console.error('Auto-reconnect error:', e);
-      }
-    }
+      <div class="settings-group">
+        <h3>연결</h3>
+        <div class="setting-row">
+          <span class="setting-label">저장된 기기</span>
+          <span class="setting-value" id="settingsSavedCount">-</span>
+        </div>
+      </div>
+    </div>
 
-    document.getElementById('refreshBtn').addEventListener('click', refreshAll);
-    document.getElementById('scanBtn').addEventListener('click', onScanDevices);
+  </div>
+</div>
 
-    // 시작 순서: 재연결 → 목록 갱신 → 주변 검색
-    autoReconnect().then(() => refreshAll());
-  </script>
+<!-- JS: 로드 순서 중요 (의존성: log → devices → discover → updates → app) -->
+<script src="js/log.js"></script>
+<script src="js/devices.js"></script>
+<script src="js/discover.js"></script>
+<script src="js/updates.js"></script>
+<script src="js/adapters.js"></script>
+<script src="js/app.js"></script>
+
 </body>
 </html>

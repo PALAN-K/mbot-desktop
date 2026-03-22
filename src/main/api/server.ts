@@ -11,9 +11,14 @@ import { createInputRoutes } from './routes/input.js';
 import { createDeviceRoutes } from './routes/device.js';
 import { createActionsRoutes } from './routes/actions.js';
 import { createPcRoutes } from './routes/pc.js';
-import { createKakaoRoutes } from './routes/adapters/kakao.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { createRateLimit } from './middleware/rateLimit.js';
+import { AdapterManager } from '../adapters/adapter-manager.js';
+import {
+  adbShell, getScreen, tap, sleep, typeText,
+  findAndTap, launchApp, waitForText, scrollUp, goBack,
+} from './routes/helpers/appHelper.js';
+import { getCenterPoint } from '../utils/uiParser.js';
 
 export interface ApiServerOptions {
   port?: number;
@@ -177,28 +182,7 @@ export function startApiServer(options: ApiServerOptions) {
           desc: 'Launch app. e.g. com.kakao.talk, com.naver.app',
         },
       ],
-      kakao_apis: [
-        {
-          method: 'POST', path: '/api/kakao/open-room',
-          body: { serial: 'string', roomName: 'string' },
-          desc: 'Open a KakaoTalk chat room by name. Searches and enters the room.',
-        },
-        {
-          method: 'POST', path: '/api/kakao/read-thread',
-          body: { serial: 'string', scrollCount: 3, maxMessages: 100 },
-          desc: 'Read chat messages from current room with scroll collection. Returns sender, text, time.',
-        },
-        {
-          method: 'POST', path: '/api/kakao/send-message',
-          body: { serial: 'string', roomName: 'string', message: 'string' },
-          desc: 'Open room + type message + send + verify. Atomic operation with Korean support.',
-        },
-        {
-          method: 'GET', path: '/api/kakao/rooms',
-          params: 'serial (query), scrollCount? (query)',
-          desc: 'List recent chat rooms with name, last message, time, unread count.',
-        },
-      ],
+      ...adapterManager.getSpecApis(),
       pc_apis: [
         {
           method: 'GET', path: '/api/pc/screenshot/file',
@@ -262,15 +246,22 @@ export function startApiServer(options: ApiServerOptions) {
     });
   });
 
+  // 어댑터 매니저 초기화 (웹 다운로드 방식 — palank.co.kr에서 설치)
+  const adapterHelpers = { adbShell, getScreen, tap, sleep, typeText, findAndTap, launchApp, waitForText, scrollUp, goBack, getCenterPoint };
+  const adapterManager = new AdapterManager(app.getPath('userData'), adapterHelpers);
+  adapterManager.setExpressApp(expressApp);
+
   // 인증 미들웨어
   expressApp.use('/api', createAuthMiddleware(token));
+
+  // 설치된 어댑터 로드 (handler.js가 Express에 직접 라우트 등록)
+  adapterManager.loadAll();
 
   // 라우트 등록
   expressApp.use('/api', createScreenRoutes(adbManager));
   expressApp.use('/api', createInputRoutes(adbManager));
   expressApp.use('/api', createDeviceRoutes(adbManager));
   expressApp.use('/api', createActionsRoutes(adbManager));
-  expressApp.use('/api/kakao', createKakaoRoutes(adbManager));
   const pcRoutes = createPcRoutes();
   expressApp.use('/api', pcRoutes);
   // 별칭: OpenClaw가 /api/file 등으로 호출할 수 있으므로 /pc/ 없이도 동작
@@ -285,6 +276,39 @@ export function startApiServer(options: ApiServerOptions) {
     next();
   }, pcRoutes);
 
+  // 어댑터 관리 API
+  expressApp.get('/api/adapters', (_req, res) => {
+    res.json({ adapters: adapterManager.list() });
+  });
+
+  expressApp.get('/api/adapters/registry', async (_req, res) => {
+    const registry = await adapterManager.fetchRegistry();
+    res.json({ adapters: registry });
+  });
+
+  expressApp.post('/api/adapters/:id/install', async (req, res) => {
+    const result = await adapterManager.install(req.params.id);
+    if (result.success) {
+      adapterManager.load(req.params.id);
+    }
+    res.json(result);
+  });
+
+  expressApp.post('/api/adapters/:id/start', (req, res) => {
+    const ok = adapterManager.start(req.params.id);
+    res.json({ status: ok ? 'started' : 'failed', id: req.params.id });
+  });
+
+  expressApp.post('/api/adapters/:id/stop', (req, res) => {
+    const ok = adapterManager.stop(req.params.id);
+    res.json({ status: ok ? 'stopped' : 'failed', id: req.params.id });
+  });
+
+  expressApp.delete('/api/adapters/:id', (req, res) => {
+    const ok = adapterManager.uninstall(req.params.id);
+    res.json({ status: ok ? 'uninstalled' : 'not_found', id: req.params.id });
+  });
+
   // 바인딩: 같은 Wi-Fi에서 폰 PRoot가 접근해야 하므로 0.0.0.0 유지
   // 단, Bearer 토큰 + CORS + Rate Limit으로 보호
   const server = expressApp.listen(port, '0.0.0.0', () => {
@@ -293,5 +317,5 @@ export function startApiServer(options: ApiServerOptions) {
     console.log(`[API] Auth token: ${token}`);
   });
 
-  return { server, token, port };
+  return { server, token, port, adapterManager };
 }
