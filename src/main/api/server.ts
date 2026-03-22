@@ -3,7 +3,8 @@ import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 import { networkInterfaces } from 'os';
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
-import { pathToFileURL } from 'url';
+import { pathToFileURL, fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import path from 'path';
 import { app } from 'electron';
 import type { AdbManager } from '../adb/AdbManager.js';
@@ -63,8 +64,8 @@ function loadBuiltinAdapters(expressApp: ReturnType<typeof express>, adbManager:
     const filePath = path.join(adaptersDir, file);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = require(filePath);
+      const cjsRequire = createRequire('file://' + filePath.replace(/\\/g, '/'));
+      const mod = cjsRequire(filePath);
 
       // create{Name}Routes 형태의 함수 찾기
       const factoryName = Object.keys(mod).find(k => k.startsWith('create') && k.endsWith('Routes'));
