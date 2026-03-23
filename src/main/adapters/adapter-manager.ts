@@ -252,11 +252,10 @@ export class AdapterManager {
     });
   }
 
-  /** 설치된 모든 어댑터 로드 (빌트인 ID가 있으면 handler.js 로드 건너뛰고 manifest만 등록) */
+  /** 설치된 모든 어댑터 로드 + 자동 업데이트 체크 */
   loadAll(builtinIds?: Set<string>): void {
     for (const id of this.getInstalledIds()) {
       if (builtinIds?.has(id)) {
-        // 빌트인 어댑터: handler.js 로드 안 함, manifest만 등록 (사이드바 표시용)
         if (!this.loaded.has(id)) {
           const manifest = this.getManifest(id);
           if (manifest) {
@@ -268,6 +267,54 @@ export class AdapterManager {
       }
       this.load(id);
     }
+
+    // 앱 시작 시 자동 업데이트 체크 (비동기, 로드 블로킹 안 함)
+    this.autoUpdate();
+  }
+
+  /** 레지스트리와 비교하여 설치된 어댑터 자동 업데이트 */
+  private async autoUpdate(): Promise<void> {
+    try {
+      const registry = await this.fetchRegistry();
+      if (!registry.length) return;
+
+      for (const entry of registry) {
+        if (entry.comingSoon) continue;
+
+        const installed = this.getManifest(entry.id);
+        if (!installed) continue; // 설치 안 된 어댑터는 건너뜀
+
+        // 버전 비교: 설치 버전 < 레지스트리 버전이면 업데이트
+        if (this.isNewerVersion(entry.version, installed.version)) {
+          console.log(`[AdapterManager] Auto-updating ${entry.id}: ${installed.version} → ${entry.version}`);
+          const result = await this.install(entry.id);
+          if (result.success) {
+            // 기존 로드 상태 제거 후 재로드
+            this.loaded.delete(entry.id);
+            this.load(entry.id);
+            console.log(`[AdapterManager] Auto-updated: ${entry.id} v${entry.version}`);
+          } else {
+            console.error(`[AdapterManager] Auto-update failed for ${entry.id}:`, result.error);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error('[AdapterManager] Auto-update check failed:', e.message);
+    }
+  }
+
+  /** 시맨틱 버전 비교: registryVer > installedVer 이면 true */
+  private isNewerVersion(registryVer: string, installedVer: string): boolean {
+    const parse = (v: string) => v.split('.').map(n => parseInt(n) || 0);
+    const r = parse(registryVer);
+    const i = parse(installedVer);
+    for (let idx = 0; idx < Math.max(r.length, i.length); idx++) {
+      const rv = r[idx] || 0;
+      const iv = i[idx] || 0;
+      if (rv > iv) return true;
+      if (rv < iv) return false;
+    }
+    return false;
   }
 
   /** /api/spec용: 실행 중 어댑터 API 목록 */
