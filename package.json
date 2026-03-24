@@ -1,6 +1,6 @@
 {
   "name": "mbot-desktop",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "mbot Desktop — AI Agent Hub for Multi-Phone Control",
   "main": "dist/main/index.js",
   "type": "module",

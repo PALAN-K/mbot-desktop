@@ -123,69 +123,8 @@ export function createActionsRoutes(_adb: AdbManager) {
     }
   });
 
-  /** POST /api/kakao/read */
-  router.post('/kakao/read', async (req, res) => {
-    const { serial, scrollCount = 0 } = req.body;
-    if (!serial) { res.status(400).json({ error: 'serial required' }); return; }
-
-    try {
-      const sc = Math.min(Math.max(Math.floor(scrollCount), 0), 20);
-      const allTexts: string[] = [];
-
-      for (let i = 0; i <= sc; i++) {
-        const elements = getScreen(serial);
-        const texts = elements.filter(e => e.text).map(e => e.text);
-        allTexts.push(...texts);
-
-        if (i < sc) {
-          adbShell(serial, ['input', 'swipe', '540', '1500', '540', '500', '300']);
-          sleep(1000);
-        }
-      }
-
-      const unique = [...new Set(allTexts)];
-      res.json({ count: unique.length, messages: unique });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  /** POST /api/kakao/send */
-  router.post('/kakao/send', async (req, res) => {
-    const { serial, message } = req.body;
-    if (!serial || !message) { res.status(400).json({ error: 'serial, message required' }); return; }
-    if (typeof message !== 'string' || message.length > 2000) { res.status(400).json({ error: 'message must be string, max 2000 chars' }); return; }
-
-    try {
-      const elements = getScreen(serial);
-      const inputField = elements.find(e =>
-        e.resourceId.includes('message_edit_text') || e.className.includes('EditText')
-      );
-      if (!inputField) { res.status(400).json({ error: 'Chat input field not found' }); return; }
-
-      const center = getCenterPoint(inputField.bounds);
-      tap(serial, center.x, center.y);
-      sleep(300);
-
-      typeText(serial, message);
-      sleep(500);
-
-      const elements2 = getScreen(serial);
-      const sendBtn = elements2.find(e =>
-        e.resourceId.includes('send') || e.contentDesc.includes('전송') || e.text === '전송'
-      );
-      if (sendBtn) {
-        const sendCenter = getCenterPoint(sendBtn.bounds);
-        tap(serial, sendCenter.x, sendCenter.y);
-        res.json({ status: 'sent', message });
-      } else {
-        adbShell(serial, ['input', 'keyevent', '66']);
-        res.json({ status: 'sent_via_enter', message });
-      }
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  // 레거시 /api/kakao/read, /api/kakao/send 삭제됨
+  // → 외부 어댑터: /api/kakao/read-thread, /api/kakao/send-message 사용
 
   /** POST /api/call */
   router.post('/call', async (req, res) => {

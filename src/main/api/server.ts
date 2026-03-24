@@ -2,9 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 import { networkInterfaces } from 'os';
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
-import { pathToFileURL, fileURLToPath } from 'url';
-import { createRequire } from 'module';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
 import path from 'path';
 import { app } from 'electron';
 import type { AdbManager } from '../adb/AdbManager.js';
@@ -41,63 +40,6 @@ function getLocalIPs(): string[] {
     }
   }
   return ips;
-}
-
-/**
- * 빌트인 어댑터 자동 스캔 + 등록
- *
- * dist/main/api/routes/adapters/ 내의 모든 .js 파일을 스캔.
- * 각 파일은 create{Name}Routes(adb, config?) 형태의 named export를 제공.
- * 파일명이 어댑터 ID가 됨 (kakao.js → /api/kakao/*).
- * userData/adapters/{id}/config.json이 있으면 remote config로 전달.
- */
-function loadBuiltinAdapters(expressApp: ReturnType<typeof express>, adbManager: AdbManager): Set<string> {
-  const builtinIds = new Set<string>();
-
-  // dist 기준 경로: __dirname은 dist/main/api/ → routes/adapters/
-  const adaptersDir = path.join(__dirname, 'routes', 'adapters');
-  if (!existsSync(adaptersDir)) {
-    console.log('[BuiltinAdapters] No adapters directory found at', adaptersDir);
-    return builtinIds;
-  }
-
-  const files = readdirSync(adaptersDir).filter(f => f.endsWith('.js'));
-  for (const file of files) {
-    const adapterId = file.replace('.js', '');
-    const filePath = path.join(adaptersDir, file);
-
-    try {
-      const cjsRequire = createRequire('file://' + filePath.replace(/\\/g, '/'));
-      const mod = cjsRequire(filePath);
-
-      // create{Name}Routes 형태의 함수 찾기
-      const factoryName = Object.keys(mod).find(k => k.startsWith('create') && k.endsWith('Routes'));
-      const factory = factoryName ? mod[factoryName] : mod.default;
-
-      if (typeof factory !== 'function') {
-        console.warn(`[BuiltinAdapters] ${file}: no factory function found, skipping`);
-        continue;
-      }
-
-      // remote config 로드 (있으면)
-      const configPath = path.join(app.getPath('userData'), 'adapters', adapterId, 'config.json');
-      let remoteConfig: any = undefined;
-      if (existsSync(configPath)) {
-        try {
-          remoteConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
-        } catch { /* ignore */ }
-      }
-
-      const router = factory(adbManager, remoteConfig);
-      expressApp.use(`/api/${adapterId}`, router);
-      builtinIds.add(adapterId);
-      console.log(`[BuiltinAdapters] Loaded: ${adapterId} → /api/${adapterId}/*${remoteConfig ? ' (with remote config)' : ''}`);
-    } catch (e: any) {
-      console.error(`[BuiltinAdapters] Failed to load ${file}:`, e.message);
-    }
-  }
-
-  return builtinIds;
 }
 
 export function startApiServer(options: ApiServerOptions) {
@@ -316,13 +258,8 @@ export function startApiServer(options: ApiServerOptions) {
   // 인증 미들웨어
   expressApp.use('/api', createAuthMiddleware(token));
 
-  // 1. 빌트인 어댑터 먼저 등록 (adapters/*.js 자동 스캔)
-  //    빌트인이 우선, handler.js는 빌트인이 없는 어댑터만 로드
-  const builtinIds = loadBuiltinAdapters(expressApp, adbManager);
-
-  // 2. 설치된 어댑터 로드 (handler.js — 빌트인과 겹치면 handler.js 로드 스킵)
-  //    단, 사이드바 표시를 위해 manifest는 loaded 맵에 등록
-  adapterManager.loadAll(builtinIds);
+  // 설치된 어댑터 로드 (동적 전용 — palank.co.kr에서 다운로드된 handler.js)
+  adapterManager.loadAll();
 
   // 라우트 등록
   expressApp.use('/api', createScreenRoutes(adbManager));

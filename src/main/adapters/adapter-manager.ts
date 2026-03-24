@@ -104,22 +104,27 @@ export class AdapterManager {
 
       writeFileSync(path.join(adapterDir, 'manifest.json'), manifestText, 'utf-8');
 
-      // config-only 모드: handler.js 대신 config.json만 다운로드
-      if (manifest.mode === 'config-only') {
-        const configUrl = `${ADAPTER_BASE_URL}/${adapterId}/config.json`;
-        const configRes = await net.fetch(configUrl);
-        if (configRes.ok) {
-          writeFileSync(path.join(adapterDir, 'config.json'), await configRes.text(), 'utf-8');
+      // handler.js 다운로드
+      const handlerUrl = `${ADAPTER_BASE_URL}/${adapterId}/handler.js`;
+      const handlerRes = await net.fetch(handlerUrl);
+      if (!handlerRes.ok) return { success: false, error: `handler.js not found (${handlerRes.status})` };
+      writeFileSync(path.join(adapterDir, 'handler.js'), await handlerRes.text(), 'utf-8');
+
+      // 플러그인 다운로드 (manifest.plugins 배열)
+      if (Array.isArray(manifest.plugins)) {
+        for (const pluginPath of manifest.plugins) {
+          const pluginUrl = `${ADAPTER_BASE_URL}/${adapterId}/${pluginPath}`;
+          const pluginRes = await net.fetch(pluginUrl);
+          if (pluginRes.ok) {
+            const localPath = path.join(adapterDir, pluginPath);
+            mkdirSync(path.dirname(localPath), { recursive: true });
+            writeFileSync(localPath, await pluginRes.text(), 'utf-8');
+          } else {
+            console.warn(`[AdapterManager] Plugin not found: ${pluginPath} (${pluginRes.status})`);
+          }
         }
-        console.log(`[AdapterManager] Installed (config-only): ${manifest.name} (${adapterId}) v${manifest.version}`);
-      } else {
-        // 레거시: handler.js 다운로드
-        const handlerUrl = `${ADAPTER_BASE_URL}/${adapterId}/handler.js`;
-        const handlerRes = await net.fetch(handlerUrl);
-        if (!handlerRes.ok) return { success: false, error: `handler.js not found (${handlerRes.status})` };
-        writeFileSync(path.join(adapterDir, 'handler.js'), await handlerRes.text(), 'utf-8');
-        console.log(`[AdapterManager] Installed: ${manifest.name} (${adapterId}) v${manifest.version}`);
       }
+      console.log(`[AdapterManager] Installed: ${manifest.name} (${adapterId}) v${manifest.version}${manifest.plugins ? ' (+' + manifest.plugins.length + ' plugins)' : ''}`);
 
       return { success: true };
     } catch (e: any) {
@@ -163,13 +168,6 @@ export class AdapterManager {
 
     const manifest = this.getManifest(adapterId);
     if (!manifest) return false;
-
-    // config-only 모드: 로직은 빌드타임에 내장되어 있으므로 handler.js 로드 불필요
-    if ((manifest as any).mode === 'config-only') {
-      this.loaded.set(adapterId, { manifest, status: 'running' });
-      console.log(`[AdapterManager] Loaded (config-only): ${manifest.name} (${adapterId}) v${manifest.version}`);
-      return true;
-    }
 
     const handlerPath = path.join(this.adaptersDir, adapterId, 'handler.js');
     if (!existsSync(handlerPath)) return false;
@@ -253,18 +251,8 @@ export class AdapterManager {
   }
 
   /** 설치된 모든 어댑터 로드 + 자동 업데이트 체크 */
-  loadAll(builtinIds?: Set<string>): void {
+  loadAll(): void {
     for (const id of this.getInstalledIds()) {
-      if (builtinIds?.has(id)) {
-        if (!this.loaded.has(id)) {
-          const manifest = this.getManifest(id);
-          if (manifest) {
-            this.loaded.set(id, { manifest, status: 'running' });
-            console.log(`[AdapterManager] Registered (builtin): ${manifest.name} (${id}) v${manifest.version}`);
-          }
-        }
-        continue;
-      }
       this.load(id);
     }
 
